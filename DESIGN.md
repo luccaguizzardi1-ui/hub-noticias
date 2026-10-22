@@ -314,6 +314,9 @@ La interacción firma. La hoja se parte por la mitad y la mitad que gira sigue a
 ### Lector
 Sube desde abajo en 420ms sobre el papel de lectura. Barra pegada arriba en chapa: insignia, medio y hora/minutos en letra apagada, y dos botones circulares de 44px (abrir el original, cerrar) con íconos de trazo 2.2. Artículo de 680px: título, bajada, firma, foto principal 3:2, aviso de «Nota a medias» en un recuadro de azulejo con junta, cuerpo. Los enlaces se subrayan con 2px del color de la línea. Al cierre: «Ver la nota en Medio» (o «Seguir leyendo en Medio» si está a medias) y la próxima nota del cuaderno como un bloque del color de la línea con su título entero y una flecha, sin rótulo encima.
 
+### Lápiz y anotaciones
+En la barra del lector, el lápiz enciende el marcador: el botón queda en un círculo blanco y aparece al pie una tira de chapa («Tocá una frase para marcarla y una marca para desmarcarla.» + «Listo»). Un toque marca la frase entera, de punto a punto; tocar una marca la desmarca. Sin el lápiz, al elegir un pedazo del texto aparece «Marcar» y al tocar una marca, «Desmarcar». La marca es el color de la línea al 28 %. Tus notas tienen tres pestañas: Guardadas, Más tarde y Anotaciones; en Anotaciones cada marca abre la nota centrada en ella, con un destello breve, y se desmarca con una cruz o con «Desmarcar todo».
+
 ### Botón sobre chapa
 Chapa invertida: fondo blanco, letra chapa, Archivo 700 16px, 15px × 22px, esquinas rectas. Es «Volver a la tapa» en el fin y «Abrir la edición» en la clave (al 60 % mientras trabaja).
 

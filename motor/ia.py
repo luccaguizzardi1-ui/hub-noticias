@@ -13,7 +13,7 @@ from categorias import CATEGORIAS, DE_AFUERA, con_perspectiva
 
 MODELOS = ("gemini-3.5-flash-lite", "gemini-flash-latest")
 # Sube cuando cambia el criterio: las notas revisadas con uno anterior se vuelven a ordenar.
-CRITERIO = 2
+CRITERIO = 3
 POR_PEDIDO = 40
 IDS = [c for c, _ in CATEGORIAS]
 
@@ -21,10 +21,12 @@ GUIA = """Ordenás las notas de un diario personal argentino en secciones. Para 
 - politica: política argentina contada por un medio argentino. Gobierno nacional, provincias, Congreso, partidos,
   elecciones, causas judiciales de políticos argentinos y la relación de la Argentina con otros países
   (Milei de viaje, lo que EE.UU. dice de una ley argentina).
-- internacional: política internacional, y sólo política. Todo lo político que no es local de la Argentina: gobiernos,
-  elecciones, partidos y líderes de otros países, diplomacia, guerras y conflictos armados, la ONU, la OTAN, la UE,
-  geopolítica. También la política argentina cuando la cuenta un medio de otro país ("de_afuera": true), porque es
-  la mirada de afuera. Un crimen, un accidente, una catástrofe, el clima o una epidemia en otro país NO van acá.
+- internacional: política internacional y geopolítica de todo el mundo. Todo lo político que no es local de la
+  Argentina: gobiernos, elecciones, partidos y líderes de otros países, diplomacia, guerras y conflictos armados,
+  la ONU, la OTAN, la UE. Y la geopolítica en general: alianzas, sanciones, potencias, rutas y recursos estratégicos
+  (petróleo, gas, Ormuz, chips) cuando el ángulo es el poder entre países y no el negocio. También la política
+  argentina cuando la cuenta un medio de otro país ("de_afuera": true), porque es la mirada de afuera.
+  Un crimen, un accidente, una catástrofe, el clima o una epidemia en otro país NO van acá.
 - economia: economía, dólar, inflación, mercados, empresas, finanzas, campo, de acá o del mundo.
 - sociedad: sociedad y policiales, de acá o de cualquier país: crímenes, justicia común, accidentes, catástrofes,
   clima, salud, epidemias, educación, religión, tránsito, ciudad, vida cotidiana.
@@ -33,7 +35,8 @@ GUIA = """Ordenás las notas de un diario personal argentino en secciones. Para 
 - cultura: espectáculos, música, cine, series, televisión, libros, arte, famosos.
 - otras: lo que no entra en ninguna (estilo de vida, turismo, gastronomía, servicios, horóscopo).
 Decidí por el tema central de la nota, no por la sección donde la publicó el medio ni por el país. Antes de elegir
-internacional preguntate si la nota trata de gobiernos, partidos, elecciones, el Estado, diplomacia o guerra; si no
+internacional preguntate si la nota trata de gobiernos, partidos, elecciones, el Estado, diplomacia, guerra o
+del poder entre países; si no
 (una estafa, un plan de negocios, el turismo, la basura, un homicidio en otro país), elegí su tema.
 Devolvé una entrada por nota, con su id."""
 

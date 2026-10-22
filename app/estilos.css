@@ -187,7 +187,7 @@ html:not(.tableta) .hoja.tapa .pieza .foto { min-height: 200px; }
 .pliegue.eje-x .hojeador .dorso { transform: rotateY(180deg); }
 
 /* ---------- Lector ---------- */
-.lector { position: fixed; inset: 0; z-index: 10; background: var(--papel-lector); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+.lector { position: fixed; inset: 0; z-index: 13; background: var(--papel-lector); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
   transform: translateY(100%); transition: transform 420ms var(--salida); visibility: hidden; }
 .lector.abierto { transform: none; visibility: visible; }
 .lector .barra { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 10px; padding: calc(var(--seguro-arriba) + 10px) 12px 10px 18px;
@@ -383,6 +383,22 @@ html:not(.tableta) .hoja.dos .bajada { display: none; }
   display: flex; align-items: center; gap: 10px; background: var(--cartel); color: var(--cartel-texto); font-weight: 700; font-size: 16px;
   padding: 13px 20px 13px 16px; box-shadow: 0 10px 28px -8px rgb(0 0 0 / 0.55); }
 .destacar[hidden] { display: none; }
+.lector.marcando ~ .destacar { bottom: calc(var(--seguro-abajo) + 84px); }
+
+/* Lápiz: mientras marca, el botón queda encendido y una tira al pie explica qué hacer */
+.lector .barra .marcar.activo { background: var(--cartel-texto); color: var(--cartel); }
+.lector .barra .marcar.activo svg { fill: none; }
+.lector.marcando { padding-bottom: calc(var(--seguro-abajo) + 72px); }
+.lector.marcando .cuerpo { cursor: pointer; }
+.tira-marcar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 14; display: flex; align-items: center; gap: 14px;
+  background: var(--cartel); color: var(--cartel-texto); padding: 12px 14px calc(var(--seguro-abajo) + 12px) 18px;
+  box-shadow: 0 -8px 24px -12px rgb(0 0 0 / 0.5); }
+.tira-marcar[hidden] { display: none; }
+.tira-marcar p { flex: 1; font-size: 15px; font-weight: 600; line-height: 1.3; }
+.tira-marcar button { flex: none; background: var(--cartel-texto); color: var(--cartel); font-weight: 700; font-size: 15px; padding: 11px 16px; }
+/* Al abrir desde Anotaciones, la marca se enciende un momento */
+.lector .cuerpo mark.resalta { animation: resalta 1600ms var(--salida); }
+@keyframes resalta { from { background: color-mix(in oklch, var(--linea) 75%, transparent); } }
 
 /* Hojita de "para más tarde" */
 .hojita { position: fixed; inset: 0; z-index: 16; background: rgb(10 11 14 / 0); display: flex; align-items: flex-end; justify-content: center;
@@ -431,11 +447,14 @@ html:not(.tableta) .hoja.dos .bajada { display: none; }
 .panel[hidden] { display: none; }
 .panel .barra { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 6px; background: var(--cartel); color: var(--cartel-texto);
   padding: calc(var(--seguro-arriba) + 8px) 8px 8px 14px; }
-.panel .pestanas { flex: 1; display: flex; gap: 4px; min-width: 0; }
-.panel .pestanas button { padding: 10px 12px; font-weight: 700; font-size: 15px; color: var(--cartel-suave); white-space: nowrap; }
+.panel .pestanas { flex: 1; display: flex; gap: 2px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.panel .pestanas::-webkit-scrollbar { display: none; }
+.panel .pestanas button { padding: 10px 9px; font-weight: 700; font-size: 15px; color: var(--cartel-suave); white-space: nowrap; flex: none; }
 .panel .pestanas button[aria-selected="true"] { color: var(--cartel-texto); box-shadow: inset 0 -3px 0 var(--cartel-texto); }
-.panel .elegir { padding: 10px 10px; font-weight: 650; font-size: 15px; }
-.panel .elegir[hidden] { display: none; }
+.panel .herramientas { max-width: 720px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 20px 0; }
+.panel .herramientas[hidden] { display: none; }
+.panel .herramientas .total { font-size: 14px; font-weight: 600; color: var(--tinta-suave); font-variant-numeric: tabular-nums; }
+.panel .herramientas .elegir { padding: 8px 0 8px 12px; font-weight: 700; font-size: 15px; color: var(--tinta); }
 .panel .icono { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; }
 .panel .lista { max-width: 720px; margin: 0 auto; padding: 8px 20px calc(var(--seguro-abajo) + 110px); }
 .panel .dia { font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--tinta-suave);
@@ -448,6 +467,11 @@ html:not(.tableta) .hoja.dos .bajada { display: none; }
 .panel .guardada .pie .gris { color: var(--tinta-suave); font-weight: 500; }
 .panel .guardada .titulo { display: block; margin-top: 8px; font-size: 21px; font-weight: 720; font-stretch: 90%; line-height: 1.12; text-wrap: balance; }
 .panel .guardada .destacados { list-style: none; margin-top: 10px; display: grid; gap: 8px; }
+.panel .guardada .destacados li { display: flex; align-items: flex-start; gap: 4px; }
+.panel .guardada .destacados .marca { flex: 1; text-align: left; padding: 2px 0; }
+.panel .guardada .destacados .borrar { width: 36px; height: 36px; flex: none; display: grid; place-items: center; margin-top: -3px; color: var(--tinta-suave); border-radius: 50%; }
+.panel .guardada .destacados .borrar:active { background: var(--junta); }
+.panel .guardada .destacados .borrar svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 2.2; fill: none; stroke-linecap: round; }
 .panel .guardada .destacados mark { font-family: var(--lectura); font-size: 17px; line-height: 1.5; color: var(--tinta);
   background: color-mix(in oklch, var(--c) 26%, transparent); box-decoration-break: clone; -webkit-box-decoration-break: clone; padding: 0.06em 0.1em; }
 .panel .guardada .acciones { display: flex; gap: 18px; margin-top: 12px; }
@@ -477,4 +501,5 @@ html:not(.tableta) .hoja.dos .bajada { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .indice, .panel, .hojita, .hojita .caja, .toast, .desplegable, .desplegable .caja, .flechita { transition: none; }
+  .lector .cuerpo mark.resalta { animation: none; }
 }

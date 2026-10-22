@@ -11,6 +11,7 @@ const indiceBoton = document.getElementById("indice-boton");
 const panel = document.getElementById("guardadas");
 const hojitaTarde = document.getElementById("mas-tarde");
 const botonDestacar = document.getElementById("destacar");
+const tiraMarcar = document.getElementById("tira-marcar");
 const chipFiltro = document.getElementById("filtro");
 const toast = document.getElementById("toast");
 
@@ -25,7 +26,7 @@ const estado = {
   orientacion: "",
   filtro: null,   // id de un medio: la edición sólo con ese medio
   leidas: new Set(),
-  biblioteca: new Map(),  // notas guardadas, para más tarde y con destacados (en este equipo)
+  biblioteca: new Map(),  // notas guardadas, para más tarde y con marcas (en este equipo)
   notaAbierta: null,
   ocupado: false,
 };
@@ -797,7 +798,7 @@ function proximaDe(id) {
   return sec ? sec.notas[sec.notas.indexOf(id) + 1] : null;
 }
 
-function abrirNota(id, { sinAnimacion = false } = {}) {
+function abrirNota(id, { sinAnimacion = false, marca = null } = {}) {
   const n = notaPorId(id);
   if (!n) return;
   const m = medioDe(n);
@@ -866,6 +867,21 @@ function abrirNota(id, { sinAnimacion = false } = {}) {
   }
   for (const n2 of [libro, recorrido, indiceBoton, chipFiltro, panel]) n2.inert = true;
   lector.querySelector("button.cerrar").focus({ preventScroll: true });
+  // Desde Anotaciones: la nota se abre en la marca que tocaste.
+  const enMarca = marca && [...cuerpo.querySelectorAll("mark")].find((x) => x.dataset.texto === marca);
+  if (enMarca) {
+    // Las fotos de arriba cargan después y empujan el texto: se vuelve a centrar mientras cargan,
+    // salvo que ya hayas empezado a mover la nota.
+    const hasta = Date.now() + 2500;
+    let tocaste = false;
+    lector.addEventListener("touchstart", () => { tocaste = true; }, { once: true, passive: true });
+    lector.addEventListener("wheel", () => { tocaste = true; }, { once: true, passive: true });
+    const centrar = () => { if (!tocaste && Date.now() < hasta) enMarca.scrollIntoView({ block: "center" }); };
+    centrar();
+    for (const img of art.querySelectorAll("img")) if (!img.complete) img.addEventListener("load", centrar, { once: true });
+    setTimeout(centrar, 460);  // cuando termina de subir el lector
+    enMarca.classList.add("resalta");
+  }
 
   estado.leidas.add(id);
   guardarMemoria("leidas", [...estado.leidas].slice(-800));
@@ -880,7 +896,9 @@ function cerrarNota() {
   lector.classList.remove("abierto");
   estado.notaAbierta = null;
   botonDestacar.hidden = true;
-  for (const n of [libro, recorrido, indiceBoton, chipFiltro]) n.inert = false;
+  ponerMarcador(false);
+  // Si la abriste desde tus notas, volvés a tus notas.
+  for (const n of [libro, recorrido, indiceBoton, chipFiltro]) n.inert = !panel.hidden;
   panel.inert = false;
   const fin = () => { if (!lector.classList.contains("abierto")) lector.hidden = true; };
   if (reducido.matches) fin(); else setTimeout(fin, 440);
@@ -908,7 +926,7 @@ lector.querySelector(".guardar").addEventListener("click", async () => {
 lector.querySelector(".compartir").addEventListener("click", () => compartir([estado.notaAbierta], "compartir"));
 lector.querySelector(".tarde").addEventListener("click", () => abrirHojita(estado.notaAbierta));
 
-/* ---------- destacar: marcar un pedazo del texto ---------- */
+/* ---------- marcar: el lápiz marca frases enteras; también se puede elegir un pedazo ---------- */
 // Envuelve en <mark> la primera aparición de `texto` dentro de `raiz`, aunque cruce negritas o enlaces.
 function marcarTexto(raiz, texto) {
   const buscado = texto.replace(/\s+/g, " ").trim();
@@ -948,11 +966,86 @@ function desmarcar(raiz, texto) {
   raiz.normalize();
 }
 
+// La frase que hay bajo el dedo: del punto anterior al siguiente, dentro del mismo párrafo.
+const ABREVIATURAS = /(?:\b(?:Sr|Sra|Dr|Dra|Lic|Ing|Gral|Cnel|Av|etc)|[A-ZÁÉÍÓÚÑ])$/;
+function fraseEn(x, y, cuerpo) {
+  let nodo, offset;
+  if (document.caretRangeFromPoint) {
+    const r = document.caretRangeFromPoint(x, y);
+    if (!r) return null;
+    [nodo, offset] = [r.startContainer, r.startOffset];
+  } else if (document.caretPositionFromPoint) {
+    const c = document.caretPositionFromPoint(x, y);
+    if (!c) return null;
+    [nodo, offset] = [c.offsetNode, c.offset];
+  } else return null;
+  if (nodo.nodeType !== Node.TEXT_NODE || !cuerpo.contains(nodo)) return null;
+  const bloque = nodo.parentElement.closest("p, li, blockquote, h2, h3, h4, figcaption, td");
+  if (!bloque || !cuerpo.contains(bloque)) return null;
+  let texto = "", pos = -1;
+  const w = document.createTreeWalker(bloque, NodeFilter.SHOW_TEXT);
+  while (w.nextNode()) {
+    if (w.currentNode === nodo) pos = texto.length + offset;
+    texto += w.currentNode.data;
+  }
+  if (pos < 0) return null;
+  const cortes = /[.!?…]["”»’)]*(?=\s|$)/g;
+  let desde = 0, hasta = texto.length, m;
+  while ((m = cortes.exec(texto))) {
+    if (m[0][0] === "." && ABREVIATURAS.test(texto.slice(0, m.index))) continue;  // EE.UU., Sr.
+    const corte = m.index + m[0].length;
+    if (corte <= pos) desde = corte;
+    else { hasta = corte; break; }
+  }
+  const frase = texto.slice(desde, hasta).replace(/\s+/g, " ").trim();
+  return frase.length >= 3 ? { frase, bloque } : null;
+}
+
+async function agregarMarca(raiz, texto) {
+  const reg = registroDe(estado.notaAbierta);
+  if (reg.destacados.some((d) => d.texto === texto) || !marcarTexto(raiz, texto)) return;
+  reg.destacados.push({ texto, creado: new Date().toISOString() });
+  await persistir(reg);
+  avisar(reg.destacados.length === 1 ? "Marcado. Está en Anotaciones" : "Marcado");
+}
+async function borrarMarca(texto) {
+  const reg = registroDe(estado.notaAbierta);
+  reg.destacados = reg.destacados.filter((d) => d.texto !== texto);
+  desmarcar(lector.querySelector(".cuerpo"), texto);
+  await persistir(reg);
+  avisar("Desmarcado");
+}
+
+let marcando = false;
+function ponerMarcador(si) {
+  marcando = si;
+  const b = lector.querySelector(".marcar");
+  b.setAttribute("aria-pressed", String(si));
+  b.setAttribute("aria-label", si ? "Dejar de marcar" : "Marcar frases");
+  b.classList.toggle("activo", si);
+  lector.classList.toggle("marcando", si);
+  tiraMarcar.hidden = !si;
+}
+lector.querySelector(".marcar").addEventListener("click", () => ponerMarcador(!marcando));
+tiraMarcar.querySelector("button").addEventListener("click", () => ponerMarcador(false));
+// Con el lápiz, tocar una frase la marca y tocar una marca la desmarca (los enlaces no se abren).
+lector.addEventListener("click", (ev) => {
+  const cuerpo = lector.querySelector(".cuerpo");
+  if (!marcando || !cuerpo?.contains(ev.target) || !getSelection().isCollapsed) return;
+  ev.preventDefault();
+  ev.stopPropagation();
+  const mark = ev.target.closest("mark");
+  if (mark) { borrarMarca(mark.dataset.texto); return; }
+  const f = fraseEn(ev.clientX, ev.clientY, cuerpo);
+  if (f) agregarMarca(f.bloque, f.frase);
+}, true);
+
+// Sin el lápiz: elegís un pedazo y aparece «Marcar»; tocás una marca y aparece «Desmarcar».
 let destacarModo = null;  // { tipo: "nuevo", texto } | { tipo: "quitar", texto }
 function pintarDestacar(modo) {
   destacarModo = modo;
   botonDestacar.hidden = !modo;
-  if (modo) botonDestacar.querySelector("span").textContent = modo.tipo === "nuevo" ? "Destacar" : "Quitar destacado";
+  if (modo) botonDestacar.querySelector("span").textContent = modo.tipo === "nuevo" ? "Marcar" : "Desmarcar";
 }
 document.addEventListener("selectionchange", () => {
   if (!lector.classList.contains("abierto")) return;
@@ -970,24 +1063,13 @@ lector.addEventListener("click", (ev) => {
 });
 botonDestacar.addEventListener("pointerdown", (ev) => ev.preventDefault());  // que no se pierda la selección
 botonDestacar.addEventListener("click", async () => {
-  if (!destacarModo) return;
-  const cuerpo = lector.querySelector(".cuerpo");
-  const reg = registroDe(estado.notaAbierta);
-  if (destacarModo.tipo === "nuevo") {
-    if (!reg.destacados.some((d) => d.texto === destacarModo.texto) && marcarTexto(cuerpo, destacarModo.texto)) {
-      reg.destacados.push({ texto: destacarModo.texto, creado: new Date().toISOString() });
-      if (!reg.guardada) reg.guardada = new Date().toISOString();
-      avisar("Destacado. La nota quedó en guardadas");
-    }
-    getSelection().removeAllRanges();
-  } else {
-    reg.destacados = reg.destacados.filter((d) => d.texto !== destacarModo.texto);
-    desmarcar(cuerpo, destacarModo.texto);
-    avisar("Destacado quitado");
-  }
-  await persistir(reg);
-  pintarBotonesLector();
+  const modo = destacarModo;
+  if (!modo) return;
   pintarDestacar(null);
+  if (modo.tipo === "nuevo") {
+    await agregarMarca(lector.querySelector(".cuerpo"), modo.texto);
+    getSelection().removeAllRanges();
+  } else await borrarMarca(modo.texto);
 });
 
 /* ---------- leer más tarde: sin aviso al teléfono, el recordatorio aparece al abrir el diario ---------- */
@@ -1067,7 +1149,7 @@ function bloqueDeNota(reg, completo) {
     return [n.titulo, `${reg.medio.nombre} · ${fecha}`, ...destacados, n.url].join("\n");
   }
   return [`# ${n.titulo}`, `${reg.medio.nombre} · ${fecha} · ${n.url}`, n.bajada || "", textoPlano(n.cuerpo_html),
-    destacados.length ? `Lo que destaqué:\n${destacados.map((d) => `- ${d}`).join("\n")}` : ""].filter(Boolean).join("\n\n");
+    destacados.length ? `Lo que marqué:\n${destacados.map((d) => `- ${d}`).join("\n")}` : ""].filter(Boolean).join("\n\n");
 }
 async function compartir(ids, como) {
   const regs = ids.map((id) => estado.biblioteca.get(id) || registroDe(id));
@@ -1093,7 +1175,7 @@ async function compartir(ids, como) {
   }
 }
 
-/* ---------- tus notas: guardadas y para más tarde ---------- */
+/* ---------- tus notas: guardadas, para más tarde y anotaciones ---------- */
 let pestana = "guardadas";
 let eligiendo = false;
 const elegidas = new Set();
@@ -1124,30 +1206,43 @@ for (const b of panel.querySelectorAll(".seleccion [data-accion]")) {
 
 function dibujarPanel() {
   for (const b of panel.querySelectorAll("[data-pestana]")) b.setAttribute("aria-selected", String(b.dataset.pestana === pestana));
-  const elegir = panel.querySelector(".elegir");
-  elegir.textContent = eligiendo ? "Listo" : "Elegir";
-  elegir.hidden = pestana !== "guardadas";
-  const regs = [...estado.biblioteca.values()].filter((r) => (pestana === "guardadas" ? r.guardada : r.masTarde));
-  // Guardadas: en orden cronológico de la nota, de la más nueva a la más vieja. Para más tarde: por hora del recordatorio.
-  if (pestana === "guardadas") regs.sort((a, b) => (b.nota.publicada || b.nota.fecha || b.guardada).localeCompare(a.nota.publicada || a.nota.fecha || a.guardada));
-  else regs.sort((a, b) => a.masTarde.localeCompare(b.masTarde));
+  const fechaNota = (r) => r.nota.publicada || r.nota.fecha || r.guardada;
+  const ultimaMarca = (r) => r.destacados.reduce((a, d) => (d.creado > a ? d.creado : a), "");
+  const regs = [...estado.biblioteca.values()].filter((r) =>
+    (pestana === "guardadas" ? r.guardada : pestana === "tarde" ? r.masTarde : r.destacados.length));
+  // Guardadas: por fecha de la nota, de la más nueva a la más vieja. Más tarde: por hora del recordatorio.
+  // Anotaciones: la nota que marcaste último, arriba.
+  if (pestana === "guardadas") regs.sort((a, b) => fechaNota(b).localeCompare(fechaNota(a)));
+  else if (pestana === "tarde") regs.sort((a, b) => a.masTarde.localeCompare(b.masTarde));
+  else regs.sort((a, b) => ultimaMarca(b).localeCompare(ultimaMarca(a)));
+
+  const herramientas = panel.querySelector(".herramientas");
+  herramientas.hidden = !regs.length;
+  const marcas = regs.reduce((t, r) => t + r.destacados.length, 0);
+  const notas = `${regs.length} ${regs.length === 1 ? "nota" : "notas"}`;
+  herramientas.querySelector(".total").textContent = pestana === "anotaciones" ? `${marcas} ${marcas === 1 ? "marca" : "marcas"} en ${notas}` : notas;
+  herramientas.querySelector(".elegir").textContent = eligiendo ? "Listo" : "Elegir";
+
   const lista = panel.querySelector(".lista");
   lista.replaceChildren();
   if (!regs.length) {
+    const [titulo, texto] = {
+      guardadas: ["Todavía no guardaste notas.", "En el lector, tocá el señalador para guardar una nota."],
+      tarde: ["No tenés notas para más tarde.", "En el lector, tocá el reloj y elegí cuándo querés que te la recuerde."],
+      anotaciones: ["Todavía no marcaste nada.", "En el lector, tocá el lápiz y después la frase que querés marcar. También podés mantener apretado el texto, elegir un pedazo y tocar «Marcar»."],
+    }[pestana];
     const vacio = el("div", "vacio");
-    vacio.append(el("h3", null, pestana === "guardadas" ? "Todavía no guardaste notas." : "No tenés notas para más tarde."),
-      el("p", null, pestana === "guardadas"
-        ? "En el lector, tocá el señalador para guardar una nota, o marcá un pedazo del texto para destacarlo."
-        : "En el lector, tocá el reloj y elegí cuándo querés que te la recuerde."));
+    vacio.append(el("h3", null, titulo), el("p", null, texto));
     lista.append(vacio);
   }
   let diaActual = "";
   for (const r of regs) {
-    const cuando = pestana === "guardadas" ? (r.nota.publicada || r.nota.fecha || r.guardada) : r.masTarde;
+    const cuando = pestana === "guardadas" ? fechaNota(r) : pestana === "tarde" ? r.masTarde : ultimaMarca(r);
     const dia = diaFmt.format(new Date(cuando));
-    if (pestana === "guardadas" && dia !== diaActual) { lista.append(el("h3", "dia", dia)); diaActual = dia; }
+    if (pestana !== "tarde" && dia !== diaActual) { lista.append(el("h3", "dia", dia)); diaActual = dia; }
     const item = el("article", "guardada");
     item.style.cssText = colores(r.medio);
+    const elegirEsta = () => item.querySelector("input").click();
     if (eligiendo) {
       const tilde = el("input");
       tilde.type = "checkbox";
@@ -1159,14 +1254,38 @@ function dibujarPanel() {
     }
     const pie = el("p", "pie");
     pie.append(insignia(r.medio), document.createTextNode(r.medio.nombre),
-      el("span", "gris", pestana === "guardadas" ? `· ${hora(r.nota.publicada || r.nota.fecha)}` : `· para después de las ${hora(r.masTarde)}`));
+      el("span", "gris", pestana === "tarde" ? `· para después de las ${hora(r.masTarde)}` : `· ${hora(r.nota.publicada || r.nota.fecha)}`));
+    // Tocar el título abre la nota acá, en el lector del diario.
     const titulo = el("button", "titulo", r.nota.titulo);
     titulo.type = "button";
-    titulo.addEventListener("click", () => (eligiendo ? item.querySelector("input").click() : abrirNota(r.id)));
+    titulo.addEventListener("click", () => (eligiendo ? elegirEsta() : abrirNota(r.id)));
     item.append(pie, titulo);
-    if (r.destacados.length) {
+    if (r.destacados.length && pestana !== "tarde") {
       const ul = el("ul", "destacados");
-      for (const d of r.destacados) { const li = el("li"); li.append(el("mark", null, d.texto)); ul.append(li); }
+      for (const d of r.destacados) {
+        const li = el("li");
+        const ir = el("button", "marca");
+        ir.type = "button";
+        ir.append(el("mark", null, d.texto));
+        ir.setAttribute("aria-label", `Abrir la nota en esta marca: ${d.texto}`);
+        ir.addEventListener("click", () => (eligiendo ? elegirEsta() : abrirNota(r.id, { marca: d.texto })));
+        li.append(ir);
+        if (pestana === "anotaciones" && !eligiendo) {
+          const borrar = el("button", "borrar");
+          borrar.type = "button";
+          borrar.setAttribute("aria-label", `Desmarcar: ${d.texto}`);
+          borrar.title = "Desmarcar";
+          borrar.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+          borrar.addEventListener("click", async () => {
+            r.destacados = r.destacados.filter((x) => x.texto !== d.texto);
+            await persistir(r);
+            dibujarPanel();
+            avisar("Desmarcado");
+          });
+          li.append(borrar);
+        }
+        ul.append(li);
+      }
       item.append(ul);
     }
     if (!eligiendo) {
@@ -1174,15 +1293,28 @@ function dibujarPanel() {
       const c = el("button", null, "Compartir");
       c.type = "button";
       c.addEventListener("click", () => compartir([r.id], "compartir"));
-      const q = el("button", null, "Quitar");
-      q.type = "button";
-      q.addEventListener("click", async () => {
-        if (pestana === "guardadas") { r.guardada = null; r.destacados = []; } else r.masTarde = null;
-        await persistir(r);
-        dibujarPanel();
-        avisar("Quitada");
-      });
-      acciones.append(c, q);
+      acciones.append(c);
+      if (pestana === "anotaciones") {
+        const todo = el("button", null, r.destacados.length > 1 ? "Desmarcar todo" : "Desmarcar");
+        todo.type = "button";
+        todo.addEventListener("click", async () => {
+          r.destacados = [];
+          await persistir(r);
+          dibujarPanel();
+          avisar("Desmarcada");
+        });
+        acciones.append(todo);
+      } else {
+        const q = el("button", null, "Quitar");
+        q.type = "button";
+        q.addEventListener("click", async () => {
+          if (pestana === "guardadas") r.guardada = null; else r.masTarde = null;  // las marcas quedan en Anotaciones
+          await persistir(r);
+          dibujarPanel();
+          avisar("Quitada");
+        });
+        acciones.append(q);
+      }
       item.append(acciones);
     }
     lista.append(item);
@@ -1232,6 +1364,7 @@ function abrirIndice() {
   const regs = [...estado.biblioteca.values()];
   boton("Guardadas", regs.filter((r) => r.guardada).length, () => abrirPanel("guardadas"));
   boton("Para más tarde", regs.filter((r) => r.masTarde).length, () => abrirPanel("tarde"));
+  boton("Anotaciones", regs.filter((r) => r.destacados.length).length, () => abrirPanel("anotaciones"));
   boton(estado.filtro ? `Medios: sólo ${estado.medios.get(estado.filtro).nombre}` : "Medios", null, () => { cerrarIndice(); abrirMedios(null); });
   indice.hidden = false;
   indiceBoton.setAttribute("aria-expanded", "true");

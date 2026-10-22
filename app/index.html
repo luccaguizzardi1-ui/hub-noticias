@@ -38,6 +38,9 @@
   <div id="lector" class="lector" role="dialog" aria-modal="true" aria-label="Nota" hidden>
     <header class="barra">
       <p class="medio"></p>
+      <button class="icono marcar" type="button" aria-pressed="false" aria-label="Marcar frases">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h7M14.5 4.5l5 5-9 9H5.5v-5z"/></svg>
+      </button>
       <button class="icono guardar" type="button" aria-pressed="false" aria-label="Guardar la nota">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h12v17l-6-4.2-6 4.2z"/></svg>
       </button>
@@ -55,9 +58,14 @@
     <footer class="cierre"></footer>
   </div>
 
+  <div id="tira-marcar" class="tira-marcar" role="status" hidden>
+    <p>Tocá una frase para marcarla y una marca para desmarcarla.</p>
+    <button type="button">Listo</button>
+  </div>
+
   <button id="destacar" class="destacar" type="button" hidden>
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h7M14.5 4.5l5 5-9 9H5.5v-5z"/></svg>
-    <span>Destacar</span>
+    <span>Marcar</span>
   </button>
 
   <nav id="indice" class="indice" aria-label="Índice de la edición" hidden>
@@ -75,13 +83,17 @@
     <header class="barra">
       <div class="pestanas" role="tablist">
         <button role="tab" type="button" data-pestana="guardadas" aria-selected="true">Guardadas</button>
-        <button role="tab" type="button" data-pestana="tarde" aria-selected="false">Para más tarde</button>
+        <button role="tab" type="button" data-pestana="tarde" aria-selected="false">Más tarde</button>
+        <button role="tab" type="button" data-pestana="anotaciones" aria-selected="false">Anotaciones</button>
       </div>
-      <button class="elegir" type="button">Elegir</button>
       <button class="icono cerrar" type="button" aria-label="Cerrar">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
     </header>
+    <div class="herramientas">
+      <p class="total"></p>
+      <button class="elegir" type="button">Elegir</button>
+    </div>
     <div class="lista"></div>
     <footer class="seleccion" hidden>
       <p class="cuantas"></p>
