@@ -415,8 +415,18 @@ function pintarRecorrido() {
   donde.replaceChildren();
   if (pos) donde.append(Object.assign(el("b"), { textContent: nombreSeccion(h.seccion) }), document.createTextNode(` · estación ${pos} de ${deSeccion.length}`));
   const siguiente = estado.hojas.slice(estado.actual + 1).find((x) => x.seccion !== h.seccion);
-  recorrido.querySelector(".proxima-seccion").textContent = estado.actual === 0 ? "Pasá la hoja"
-    : siguiente && pos === deSeccion.length && siguiente.seccion !== "fin" ? `Próxima: ${nombreSeccion(siguiente.seccion)}` : "";
+  const ultima = siguiente && pos === deSeccion.length && siguiente.seccion !== "fin";
+  const proxima = recorrido.querySelector(".proxima-seccion");
+  proxima.textContent = estado.actual === 0 ? "Pasá la hoja" : ultima ? `Próxima: ${nombreSeccion(siguiente.seccion)}` : "";
+  // Si en el teléfono no entra en un renglón: sin el número de estación y con una flecha.
+  if (ultima && (donde.offsetHeight > 20 || proxima.offsetHeight > 20)) {
+    donde.replaceChildren(Object.assign(el("b"), { textContent: nombreSeccion(h.seccion) }));
+    const flecha = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    flecha.setAttribute("viewBox", "0 0 24 24");
+    flecha.setAttribute("aria-hidden", "true");
+    flecha.innerHTML = '<path d="M4 12h15M13 6l6 6-6 6"/>';
+    proxima.replaceChildren(el("span", "oculto", "Próxima: "), flecha, document.createTextNode(nombreSeccion(siguiente.seccion)));
+  }
 }
 
 function pintarAperturas() {

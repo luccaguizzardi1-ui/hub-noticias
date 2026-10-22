@@ -1,5 +1,5 @@
 """Arma la edición: las últimas notas de cada medio, extraídas tal cual, en un JSON
-que la app lee: tapa y secciones (Política argentina, Internacional, ...).
+que la app lee: tapa y secciones (Política argentina, Política internacional, ...).
 
     .venv/bin/python motor/edicion.py                 # edición completa
     .venv/bin/python motor/edicion.py --por-medio 6   # más chica, para probar
@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from categorias import CATEGORIAS, clasificar  # noqa: E402
 from extraer import extraer, solo_comienzo  # noqa: E402
 from fuentes import descubrir, link_real  # noqa: E402
-from ia import clasificar_con_ia  # noqa: E402
+from ia import CRITERIO, clasificar_con_ia  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 PALABRAS_POR_MINUTO = 220
@@ -87,7 +87,7 @@ def secciones_y_tapa(todas):
         if de_la_categoria:
             secciones.append({"id": cat_id, "nombre": nombre, "notas": [n["id"] for n in de_la_categoria]})
 
-    # Tapa: lo más fresco y completo, con foto, de Política argentina (o de Internacional si no hay).
+    # Tapa: lo más fresco y completo, con foto, de Política argentina (o de Política internacional si no hay).
     tapa = []
     for sec in secciones[:2]:
         candidatas = [n for n in todas if n["id"] in sec["notas"] and n["foto"] and not n["a_medias"]]
@@ -110,10 +110,10 @@ def armar(medios, por_medio, horas, anterior=None):
     todas = [n for _, notas in resultados for n in notas]
     con_notas = {n["medio"] for n in todas}
 
-    # Gemini revisa la sección de lo nuevo (sólo título y bajada); lo ya revisado se reusa tal cual.
-    sin_revisar = [n for n in todas if not n.get("por_ia")]
+    # Gemini revisa la sección de lo nuevo (sólo título y bajada); lo ya revisado con este criterio se reusa tal cual.
+    sin_revisar = [n for n in todas if n.get("por_ia") != CRITERIO]
     revisadas = clasificar_con_ia(sin_revisar, {m["id"]: m["nombre"] for m in medios})
-    print(f"Secciones: {revisadas} de {len(sin_revisar)} notas nuevas ordenadas por Gemini, el resto por reglas")
+    print(f"Secciones: {revisadas} de {len(sin_revisar)} notas sin revisar ordenadas por Gemini, el resto por reglas")
 
     secciones, tapa = secciones_y_tapa(todas)
 

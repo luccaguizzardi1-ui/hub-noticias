@@ -13,7 +13,7 @@ from urllib.parse import urlparse
 
 CATEGORIAS = [
     ("politica", "Política argentina"),
-    ("internacional", "Internacional"),
+    ("internacional", "Política internacional"),
     ("economia", "Economía"),
     ("sociedad", "Sociedad y policiales"),
     ("tecnologia", "IA y tecnología"),
@@ -22,7 +22,8 @@ CATEGORIAS = [
     ("otras", "Otras"),
 ]
 
-# Medios que miran la Argentina desde afuera: su "política" es internacional para este diario.
+# Medios que miran la Argentina desde afuera (el grupo "afuera" de datos/medios.json): su política,
+# aunque sea sobre la Argentina, va a Política internacional, porque es la mirada de otro país.
 DE_AFUERA = {"elpais", "elmundo", "bbcmundo", "cnnespanol", "nytes", "elordenmundial", "legrandcontinent", "infobaeamerica"}
 POR_DEFECTO = {"xataka": "tecnologia", "hipertextual": "tecnologia", "bloomberglinea": "economia",
                "lpo": "politica", "letrap": "politica"}
@@ -51,11 +52,6 @@ SECCIONES = {
     "politica": "politica el-pais congreso elecciones gobierno legislatura provincias opinion modo-fontevecchia",
     "otras": "lifestyle turismo gastronomia bienestar viajes horoscopo",
 }
-
-# Lo que delata que una nota de afuera habla de la Argentina (diputado o senado solos pueden ser de España).
-ARGENTINA = set("argentina argentino argentinos argentinas milei kicillof cristina-kirchner kirchner kirchnerismo massa "
-                "macri villarruel adorni karina-milei casa-rosada peronismo la-libertad-avanza bullrich buenos-aires "
-                "malvinas caputo".split())
 
 # Último recurso: palabras del título y la bajada.
 PALABRAS = {
@@ -117,14 +113,19 @@ def clasificar(nota, medio_id, categorias_rss=()):
         return "cultura" if _por_seccion(etiquetas) == "cultura" else "tecnologia"
 
     cat = _por_seccion(etiquetas)
+    tema = _por_palabras(texto)
+    # "Internacional" es política internacional: un crimen o un temporal de afuera va a su tema.
+    if cat == "internacional" and tema in ("sociedad", "economia", "deportes", "tecnologia", "cultura"):
+        return tema
     if medio_id in DE_AFUERA:
-        # Si hablan de la política argentina, va a Política; si no, su política es internacional.
-        t = f"-{_norm(texto)}-"
-        if _por_palabras(texto) == "politica" and any(f"-{p}-" in t for p in ARGENTINA):
-            return "politica"
-        return "internacional" if cat in (None, "politica", "sociedad", "otras") else cat
-    if cat == "politica" and _por_palabras(texto) == "internacional":
+        if cat is None and tema in ("sociedad", "economia", "deportes", "tecnologia", "cultura"):
+            return tema
+        return "internacional" if cat in (None, "politica") else cat
+    if cat == "politica" and tema == "internacional":
         return "internacional"  # p. ej. Letra P sobre el balotaje de Lula, en su sección Política
-    if cat:
-        return cat
-    return POR_DEFECTO.get(medio_id) or _por_palabras(texto) or "otras"
+    return cat or POR_DEFECTO.get(medio_id) or tema or "otras"
+
+
+def con_perspectiva(cat, medio_id):
+    """La política que cuenta un medio de afuera, aunque sea sobre la Argentina, es Política internacional."""
+    return "internacional" if cat == "politica" and medio_id in DE_AFUERA else cat

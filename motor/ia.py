@@ -9,25 +9,33 @@ import os
 import urllib.request
 from pathlib import Path
 
-from categorias import CATEGORIAS
+from categorias import CATEGORIAS, DE_AFUERA, con_perspectiva
 
 MODELOS = ("gemini-3.5-flash-lite", "gemini-flash-latest")
+# Sube cuando cambia el criterio: las notas revisadas con uno anterior se vuelven a ordenar.
+CRITERIO = 2
 POR_PEDIDO = 40
 IDS = [c for c, _ in CATEGORIAS]
 
 GUIA = """Ordenás las notas de un diario personal argentino en secciones. Para cada nota elegí UNA:
-- politica: política argentina. Gobierno nacional, provincias, Congreso, partidos, elecciones, causas judiciales
-  de políticos argentinos y la relación de la Argentina con otros países (Milei de viaje, lo que EE.UU. dice de una ley argentina).
-- internacional: lo que pasa fuera de la Argentina y no la involucra: política de otros países (España, EE.UU.,
-  Brasil, Europa), guerras, diplomacia, el Papa, y también crímenes, catástrofes, clima y epidemias de otros países.
+- politica: política argentina contada por un medio argentino. Gobierno nacional, provincias, Congreso, partidos,
+  elecciones, causas judiciales de políticos argentinos y la relación de la Argentina con otros países
+  (Milei de viaje, lo que EE.UU. dice de una ley argentina).
+- internacional: política internacional, y sólo política. Todo lo político que no es local de la Argentina: gobiernos,
+  elecciones, partidos y líderes de otros países, diplomacia, guerras y conflictos armados, la ONU, la OTAN, la UE,
+  geopolítica. También la política argentina cuando la cuenta un medio de otro país ("de_afuera": true), porque es
+  la mirada de afuera. Un crimen, un accidente, una catástrofe, el clima o una epidemia en otro país NO van acá.
 - economia: economía, dólar, inflación, mercados, empresas, finanzas, campo, de acá o del mundo.
-- sociedad: sociedad y policiales de la Argentina: crímenes, justicia común, salud, educación, clima, tránsito,
-  ciudad, vida cotidiana. Salud o bienestar sin un país en particular también va acá.
+- sociedad: sociedad y policiales, de acá o de cualquier país: crímenes, justicia común, accidentes, catástrofes,
+  clima, salud, epidemias, educación, religión, tránsito, ciudad, vida cotidiana.
 - tecnologia: inteligencia artificial, tecnología, internet, ciencia, espacio, videojuegos.
 - deportes: deportes.
 - cultura: espectáculos, música, cine, series, televisión, libros, arte, famosos.
 - otras: lo que no entra en ninguna (estilo de vida, turismo, gastronomía, servicios, horóscopo).
-Decidí por el tema central de la nota, no por la sección donde la publicó el medio. Devolvé una entrada por nota, con su id."""
+Decidí por el tema central de la nota, no por la sección donde la publicó el medio ni por el país. Antes de elegir
+internacional preguntate si la nota trata de gobiernos, partidos, elecciones, el Estado, diplomacia o guerra; si no
+(una estafa, un plan de negocios, el turismo, la basura, un homicidio en otro país), elegí su tema.
+Devolvé una entrada por nota, con su id."""
 
 
 def _clave():
@@ -70,7 +78,8 @@ def clasificar_con_ia(notas, nombres):
     hechas = 0
     for i in range(0, len(notas), POR_PEDIDO):
         tanda = notas[i:i + POR_PEDIDO]
-        lista = [{"id": n["id"], "medio": nombres.get(n["medio"], n["medio"]), "seccion_del_medio": n.get("seccion", ""),
+        lista = [{"id": n["id"], "medio": nombres.get(n["medio"], n["medio"]), "de_afuera": n["medio"] in DE_AFUERA,
+                  "seccion_del_medio": n.get("seccion", ""),
                   "titulo": n["titulo"], "bajada": (n.get("bajada") or "")[:300]} for n in tanda]
         elegidas = {}
         for modelo in MODELOS:
@@ -81,7 +90,7 @@ def clasificar_con_ia(notas, nombres):
                 print(f"Gemini ({modelo}) no respondió ({type(e).__name__}); quedan las reglas")
         for n in tanda:
             if n["id"] in elegidas:
-                n["categoria"] = elegidas[n["id"]]
-                n["por_ia"] = True
+                n["categoria"] = con_perspectiva(elegidas[n["id"]], n["medio"])
+                n["por_ia"] = CRITERIO
                 hechas += 1
     return hechas
