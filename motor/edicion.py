@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from categorias import CATEGORIAS, clasificar  # noqa: E402
 from extraer import extraer, solo_comienzo  # noqa: E402
 from fuentes import descubrir, link_real  # noqa: E402
+from google_news import titulares  # noqa: E402
 from ia import CRITERIO, agrupar_temas, clasificar_con_ia  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -135,7 +136,7 @@ def _fecha(n):
         return datetime(2000, 1, 1, tzinfo=timezone.utc)
 
 
-def secciones_y_tapa(todas, medios=(), temas=()):
+def secciones_y_tapa(todas, medios=(), temas=(), google=None):
     grupo = {m["id"]: m.get("grupo", "aca") for m in medios}
     # Una sección por categoría, en el orden de Lucca, con los medios mezclados.
     secciones = []
@@ -149,15 +150,16 @@ def secciones_y_tapa(todas, medios=(), temas=()):
         if de_la_categoria:
             secciones.append({"id": cat_id, "nombre": nombre, "notas": [n["id"] for n in de_la_categoria]})
 
-    destacadas = elegir_destacadas(todas, temas, grupo)
+    destacadas = elegir_destacadas(todas, temas, grupo, google or {})
     # La tapa de antes (lista de ids) queda por compatibilidad con una app vieja guardada en el teléfono.
     tapa = [destacadas["principal"]] + [d["nota"] for d in destacadas["secciones"]][:2] if destacadas["principal"] else []
     return secciones, tapa, destacadas
 
 
-def elegir_destacadas(todas, temas, grupo):
-    """Lo más destacado del momento: el hecho que más medios cuentan a la vez, con desempate por
-    lo más reciente. Una principal y una por sección (sin repetir el mismo hecho). De cada hecho
+def elegir_destacadas(todas, temas, grupo, google):
+    """Lo más destacado del momento: el hecho que más medios cuentan a la vez, más lo arriba que esté
+    en Google News Argentina (`google`: id de nota -> puntos por su puesto), con desempate por lo
+    más reciente. Una principal y una por sección (sin repetir el mismo hecho). De cada hecho
     se muestra la mejor versión: completa, con foto y, en Política argentina, de un medio de acá."""
     por_id = {n["id"]: n for n in todas}
     tema_de = {i: g for g in temas for i in g}
@@ -171,7 +173,8 @@ def elegir_destacadas(todas, temas, grupo):
         horas = (ahora - max(_fecha(n) for n in ns)).total_seconds() / 3600
         frescura = 1.0 if horas <= 6 else 0.75 if horas <= 12 else 0.5 if horas <= 24 else 0.3
         completa = any(not n["a_medias"] and n["foto"] for n in ns)
-        return len({n["medio"] for n in ns}) * frescura + (0.2 if completa else 0)
+        en_google = max((google.get(i, 0) for i in ids), default=0)
+        return len({n["medio"] for n in ns}) * frescura + (0.2 if completa else 0) + en_google
 
     def de_servicio(n):  # cotizaciones del día, minuto a minuto: no son la mejor versión de un hecho
         return bool(SERVICIO.search(n["titulo"]))
@@ -246,9 +249,23 @@ def armar(medios, por_medio, horas, anterior=None):
     print(f"Secciones: {revisadas} de {len(sin_revisar)} notas sin revisar ordenadas por Gemini, el resto por reglas")
 
     # Gemini agrupa las notas que cuentan el mismo hecho: de ahí salen la tapa y las otras versiones.
-    temas = agrupar_temas(todas, {m["id"]: m["nombre"] for m in medios})
-    print(f"Temas: {len(temas)} hechos contados por más de un medio")
-    secciones, tapa, destacadas = secciones_y_tapa(todas, medios, temas)
+    # Los titulares de Google News entran en la misma ronda sólo como referencia: el hecho que Google
+    # tiene arriba suma puntos para la tapa, pero en el diario siempre se muestra la nota de tus medios.
+    de_google = titulares()
+    peso = {g["id"]: g["peso"] for g in de_google}
+    nombres = {m["id"]: m["nombre"] for m in medios} | {"google": "Google News"}
+    nuestros = {n["id"] for n in todas}
+    temas, google = [], {}
+    for g in agrupar_temas(todas + de_google, nombres):
+        mios = [i for i in g if i in nuestros]
+        puntos = max((peso[i] for i in g if i in peso), default=0)
+        for i in mios:
+            google[i] = max(google.get(i, 0), puntos)
+        if len(mios) >= 2:
+            temas.append(mios)
+    print(f"Temas: {len(temas)} hechos contados por más de un medio; "
+          f"Google News: {len(de_google)} titulares, {sum(1 for v in google.values() if v)} notas tuyas coinciden")
+    secciones, tapa, destacadas = secciones_y_tapa(todas, medios, temas, google)
 
     return {
         "generada": datetime.now(timezone.utc).isoformat(timespec="seconds"),

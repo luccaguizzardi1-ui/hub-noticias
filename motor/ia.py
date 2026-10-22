@@ -62,6 +62,8 @@ ESQUEMA_SECCIONES = {"type": "ARRAY", "items": {
 GUIA_TEMAS = """Te paso notas de distintos medios (id, medio, título y bajada). Agrupá las que cuentan EL MISMO hecho
 puntual: la misma noticia, aunque cada medio la titule distinto (por ejemplo, tres medios sobre la misma declaración
 de Milei, o dos sobre el mismo partido). No agrupes por tema general: "economía argentina" o "Trump" no son un hecho.
+Algunas entradas son titulares de referencia de Google News (medio "Google News"): agrupalos con las notas que
+cuentan el mismo hecho, igual que a las demás.
 Cada nota va en un solo grupo como máximo. Devolvé sólo los grupos de 2 o más notas, con sus ids."""
 
 ESQUEMA_TEMAS = {"type": "ARRAY", "items": {
