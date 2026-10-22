@@ -112,6 +112,15 @@ def sin_encabezado(fragmento, titulo, bajada):
     return (div.text or "") + "".join(lhtml.tostring(c, encoding="unicode") for c in div)
 
 
+def _documento(cuerpo):
+    """Árbol de la página leído como UTF-8 cuando lo es: algunos sitios (CNN) declaran
+    el juego de caracteres tarde y lxml los leía como latin-1 ("advirtiÃ³")."""
+    try:
+        return lhtml.fromstring(cuerpo.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError):
+        return lhtml.fromstring(cuerpo)
+
+
 def _ld_articulos(doc):
     """Objetos NewsArticle/Article del JSON-LD de la página."""
     salida = []
@@ -245,7 +254,7 @@ def extraer(url, item=None):
         nota["motivo"] = motivo
         return nota
 
-    doc = lhtml.fromstring(r.cuerpo)
+    doc = _documento(r.cuerpo)
     ld = _ld_articulos(doc)
     cuerpo_ld = next((a.get("articleBody") for a in ld if a.get("articleBody")), "") or \
         next(iter(doc.xpath('//*[@itemprop="articleBody"]/@content')), "")

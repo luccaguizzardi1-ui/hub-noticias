@@ -7,3 +7,5 @@ informes/
 .claude/agents/
 .claude/settings.local.json
 .env
+# La edición lleva el texto completo de las notas: nunca se sube sin cifrar.
+app/datos/

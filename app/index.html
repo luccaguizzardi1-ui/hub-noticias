@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#16181D">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="el diario del pelado">
+<title>el diario del pelado</title>
+<link rel="preload" href="fuentes/archivo-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fuentes/alegreya-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+  <main id="libro" class="libro" aria-roledescription="diario" aria-label="Edición de el diario del pelado"></main>
+
+  <nav id="recorrido" class="recorrido" aria-label="Dónde estás en la edición">
+    <div class="via"></div>
+    <p class="leyenda"><span class="donde"></span><span class="proxima-seccion"></span></p>
+  </nav>
+
+  <div id="lector" class="lector" role="dialog" aria-modal="true" aria-label="Nota" hidden>
+    <header class="barra">
+      <p class="medio"></p>
+      <a class="cerrar enlace-original" target="_blank" rel="noopener" aria-label="Abrir la nota en el sitio del medio">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
+      </a>
+      <button class="cerrar" type="button" aria-label="Cerrar la nota">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </header>
+    <article></article>
+    <footer class="cierre"></footer>
+  </div>
+
+  <p id="aviso" class="oculto" aria-live="polite"></p>
+  <script src="app.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 390px; height: 844px; overflow: hidden; }
+  body { background: #0B0B0B; color: #fff; font-family: "Barlow Condensed", sans-serif; text-transform: uppercase; }
+  .campo { background: #FF5B14; height: 330px; padding: 56px 16px 0; position: relative; }
+  .campo b { font-size: 30px; font-weight: 700; letter-spacing: 0.02em; color: #0B0B0B; }
+  .campo small { display: block; font-size: 14px; font-weight: 500; color: #0B0B0B; letter-spacing: 0.08em; margin-top: 2px; }
+  .riel { position: absolute; left: 0; right: 0; top: 140px; height: 150px; background: #0B0B0B; display: flex; gap: 6px; padding: 22px 8px; }
+  .riel::before, .riel::after { content: ""; position: absolute; left: 0; right: 0; height: 8px; background: repeating-linear-gradient(90deg, transparent 0 8px, #FF5B14 8px 16px); }
+  .riel::before { top: 6px; } .riel::after { bottom: 6px; }
+  .cuadro { flex: none; width: 140px; height: 106px; object-fit: cover; }
+  .bandera { position: absolute; top: 118px; left: 160px; background: #fff; color: #0B0B0B; font-size: 13px; font-weight: 700; padding: 3px 8px; letter-spacing: 0.06em; }
+  .ventana { background: #fff; color: #0B0B0B; margin: 16px; padding: 16px; }
+  .ventana .m { font-size: 14px; font-weight: 700; letter-spacing: 0.1em; color: #FF5B14; }
+  .ventana h2 { font-size: 34px; line-height: 1; font-weight: 700; margin-top: 8px; }
+  .ventana p { font-size: 15px; font-weight: 500; text-transform: none; margin-top: 10px; color: #333; }
+  .cola { padding: 0 16px; font-size: 14px; letter-spacing: 0.08em; color: #999; }
+</style>
+</head>
+<body>
+  <section class="campo">
+    <b>el diario del pelado</b>
+    <small>Rollo 22.10 · 16:40 · 64 cuadros</small>
+    <div class="riel">
+      <img class="cuadro" src="https://ichef.bbci.co.uk/news/1200/branded_mundo/f3b2/live/6b10a760-ce38-11f1-a86f-f78305ec9987.png" alt="" referrerpolicy="no-referrer">
+      <img class="cuadro" src="https://eldoce.tv/resizer/v2/varios-barrios-de-cordoba-sin-luz-este-jueves-en-cordoba-JJ2XMNMFFNCMNKW562OH6GSNRM.jpg?auth=833b0dda0b987a1da1baa86a9406e4e6381c4692d1f167e0f188c91da68c671d&width=1023" alt="" referrerpolicy="no-referrer">
+      <img class="cuadro" src="https://fotos.perfil.com/2026/10/22/trim/1140/641/los-cuentos-de-hoffmann-en-el-teatro-colon-2354364.jpg" alt="" referrerpolicy="no-referrer">
+    </div>
+    <span class="bandera">Acá quedaste</span>
+  </section>
+  <article class="ventana">
+    <span class="m">BBC Mundo · 8 min</span>
+    <h2>Cómo Trump está tratando de influir para que Flávio Bolsonaro gane a Lula</h2>
+    <p>El presidente de EE.UU., Donald Trump, dijo que sigue muy de cerca la elección brasileña.</p>
+  </article>
+  <p class="cola">Colgadas en el bin: 3 notas para después</p>
+</body>
+</html>

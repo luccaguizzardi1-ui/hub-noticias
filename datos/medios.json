@@ -5,72 +5,127 @@
   "pais": "España",
   "web": "https://elpais.com",
   "feed": "https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/portada",
-  "a_medias": true
+  "a_medias": true,
+  "linea": {
+   "letra": "E",
+   "color": "#A0522D",
+   "tinta": "#FFFFFF"
+  }
  },
  {
   "id": "bbcmundo",
   "nombre": "BBC Mundo",
   "pais": "Reino Unido",
   "web": "https://www.bbc.com/mundo",
-  "feed": "https://feeds.bbci.co.uk/mundo/rss.xml"
+  "feed": "https://feeds.bbci.co.uk/mundo/rss.xml",
+  "linea": {
+   "letra": "B",
+   "color": "#00857C",
+   "tinta": "#FFFFFF"
+  }
  },
  {
   "id": "elmundo",
   "nombre": "El Mundo",
   "pais": "España",
   "web": "https://www.elmundo.es",
-  "feed": "https://e00-elmundo.uecdn.es/elmundo/rss/portada.xml"
+  "feed": "https://e00-elmundo.uecdn.es/elmundo/rss/portada.xml",
+  "linea": {
+   "letra": "M",
+   "color": "#E4007C",
+   "tinta": "#FFFFFF"
+  }
  },
  {
   "id": "cnnespanol",
   "nombre": "CNN en Español",
   "pais": "Estados Unidos",
-  "web": "https://cnnespanol.cnn.com"
+  "web": "https://cnnespanol.cnn.com",
+  "linea": {
+   "letra": "C",
+   "color": "#F15A22",
+   "tinta": "#16181D"
+  }
  },
  {
   "id": "infobae",
   "nombre": "Infobae",
   "pais": "Argentina",
-  "web": "https://www.infobae.com"
+  "web": "https://www.infobae.com",
+  "linea": {
+   "letra": "I",
+   "color": "#F7A800",
+   "tinta": "#16181D"
+  }
  },
  {
   "id": "eldoce",
   "nombre": "El Doce",
   "pais": "Argentina",
   "web": "https://eldoce.tv",
-  "feed": "https://eldoce.tv/arc/outboundfeeds/rss/?outputType=xml"
+  "feed": "https://eldoce.tv/arc/outboundfeeds/rss/?outputType=xml",
+  "linea": {
+   "letra": "D",
+   "color": "#00A651",
+   "tinta": "#16181D"
+  }
  },
  {
   "id": "lanacion",
   "nombre": "La Nación",
   "pais": "Argentina",
-  "web": "https://www.lanacion.com.ar"
+  "web": "https://www.lanacion.com.ar",
+  "linea": {
+   "letra": "N",
+   "color": "#0072BC",
+   "tinta": "#FFFFFF"
+  }
  },
  {
   "id": "pagina12",
   "nombre": "Página/12",
   "pais": "Argentina",
-  "web": "https://www.pagina12.com.ar"
+  "web": "https://www.pagina12.com.ar",
+  "linea": {
+   "letra": "12",
+   "color": "#E2231A",
+   "tinta": "#FFFFFF"
+  }
  },
  {
   "id": "perfil",
   "nombre": "Perfil",
   "pais": "Argentina",
   "web": "https://www.perfil.com",
-  "feed": "https://www.perfil.com/feed"
+  "feed": "https://www.perfil.com/feed",
+  "linea": {
+   "letra": "P",
+   "color": "#7B3F98",
+   "tinta": "#FFFFFF"
+  }
  },
  {
   "id": "tn",
   "nombre": "Todo Noticias",
   "pais": "Argentina",
   "web": "https://tn.com.ar",
-  "feed": "https://tn.com.ar/arc/outboundfeeds/rss/?outputType=xml"
+  "feed": "https://tn.com.ar/arc/outboundfeeds/rss/?outputType=xml",
+  "linea": {
+   "letra": "T",
+   "color": "#00A6E0",
+   "tinta": "#16181D"
+  }
  },
  {
   "id": "eldiplo",
   "nombre": "Le Monde Diplomatique – Cono Sur",
   "pais": "Argentina",
   "web": "https://www.eldiplo.org",
-  "sitemap": "https://www.eldiplo.org/wp-sitemap-posts-post-4.xml"
+  "sitemap": "https://www.eldiplo.org/wp-sitemap-posts-post-4.xml",
+  "linea": {
+   "letra": "L",
+   "color": "#8DC63F",
+   "tinta": "#16181D"
+  }
  }
 ]

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=Alegreya:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 390px; height: 844px; overflow: hidden; }
+  body { background: #F7F7F4; color: #16181D; font-family: "Archivo", sans-serif; }
+  .cartel { background: #16181D; color: #fff; padding: 58px 20px 18px; }
+  .cartel h1 { font-weight: 760; font-stretch: 88%; font-size: 40px; line-height: 0.95; letter-spacing: -0.02em; }
+  .cartel .hora { margin-top: 10px; font-size: 13px; font-weight: 500; color: #B9BCC4; font-variant-numeric: tabular-nums; }
+  .lineas { display: flex; gap: 5px; margin-top: 14px; }
+  .b { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 800; color: #fff; flex: none; }
+  .b.osc { color: #16181D; }
+  .friso { height: 10px; background: #00857C; }
+  .foto { width: 390px; height: 292px; object-fit: cover; display: block; }
+  .nota { padding: 16px 20px 0; }
+  .etiqueta { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .etiqueta span.sep { color: #8A8D94; font-weight: 500; }
+  .nota h2 { margin-top: 10px; font-weight: 720; font-stretch: 92%; font-size: 29px; line-height: 1.04; letter-spacing: -0.015em; text-wrap: balance; }
+  .nota p { margin-top: 10px; font-family: "Alegreya", serif; font-size: 17px; line-height: 1.4; color: #3A3D44; }
+  .recorrido { position: absolute; left: 0; right: 0; bottom: 0; height: 74px; background: #F7F7F4; border-top: 1px solid #DCDCD6; padding: 14px 20px 0; }
+  .via { position: relative; height: 14px; }
+  .via::before { content: ""; position: absolute; left: 0; right: 0; top: 5px; height: 4px; background: linear-gradient(90deg, #00857C 0 9%, #F15A22 9% 18%, #00A651 18% 27%, #E4007C 27% 36%, #A0522D 36% 45%, #F7A800 45% 54%, #0072BC 54% 63%, #8DC63F 63% 72%, #E2231A 72% 81%, #7B3F98 81% 90%, #00A6E0 90%); }
+  .est { position: absolute; top: 0; width: 14px; height: 14px; border-radius: 50%; background: #F7F7F4; border: 3px solid #16181D; }
+  .est.aca { width: 18px; height: 18px; top: -2px; background: #16181D; }
+  .pie { display: flex; justify-content: space-between; margin-top: 10px; font-size: 12px; font-weight: 600; color: #4A4D55; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+  <header class="cartel">
+    <h1>el diario<br>del pelado</h1>
+    <p class="hora">Edición de las 16:40 · jueves 22 de octubre · 64 notas</p>
+    <div class="lineas" aria-label="Medios de la edición">
+      <span class="b" style="background:#00857C">B</span>
+      <span class="b" style="background:#F15A22">C</span>
+      <span class="b" style="background:#00A651">D</span>
+      <span class="b" style="background:#E4007C">M</span>
+      <span class="b" style="background:#A0522D">E</span>
+      <span class="b osc" style="background:#F7A800">I</span>
+      <span class="b" style="background:#0072BC">N</span>
+      <span class="b osc" style="background:#8DC63F">L</span>
+      <span class="b" style="background:#E2231A">12</span>
+      <span class="b" style="background:#7B3F98">P</span>
+      <span class="b" style="background:#00A6E0">T</span>
+    </div>
+  </header>
+  <div class="friso"></div>
+  <img class="foto" src="https://ichef.bbci.co.uk/news/1200/branded_mundo/f3b2/live/6b10a760-ce38-11f1-a86f-f78305ec9987.png" alt="" referrerpolicy="no-referrer">
+  <article class="nota">
+    <div class="etiqueta"><span class="b" style="background:#00857C">B</span>BBC Mundo <span class="sep">· 16:12 · 8 min</span></div>
+    <h2>Cómo Trump está tratando de influir para que Flávio Bolsonaro gane a Lula en las elecciones de Brasil</h2>
+    <p>El presidente de EE.UU., Donald Trump, dijo que sigue muy de cerca la elección brasileña.</p>
+  </article>
+  <footer class="recorrido">
+    <div class="via">
+      <span class="est aca" style="left:0"></span>
+      <span class="est" style="left:17%"></span>
+      <span class="est" style="left:34%"></span>
+      <span class="est" style="left:51%"></span>
+      <span class="est" style="left:68%"></span>
+      <span class="est" style="left:calc(100% - 14px)"></span>
+    </div>
+    <div class="pie"><span>Combinación · estación 1 de 64</span><span>Pasá la hoja ↑</span></div>
+  </footer>
+</body>
+</html>

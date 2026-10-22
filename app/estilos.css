@@ -1,0 +1,273 @@
+/* el diario del pelado — mundo «Andén»: señalética del subte porteño.
+   El marco (cartel, insignias, frisos, aperturas) es del subte; la columna de lectura es calma. */
+
+@font-face { font-family: "Archivo"; font-style: normal; font-weight: 100 900; font-stretch: 62% 125%; font-display: swap;
+  src: url("fuentes/archivo-normal-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Archivo"; font-style: normal; font-weight: 100 900; font-stretch: 62% 125%; font-display: swap;
+  src: url("fuentes/archivo-normal-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "Alegreya"; font-style: normal; font-weight: 400 900; font-display: swap;
+  src: url("fuentes/alegreya-normal-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Alegreya"; font-style: normal; font-weight: 400 900; font-display: swap;
+  src: url("fuentes/alegreya-normal-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "Alegreya"; font-style: italic; font-weight: 400 900; font-display: swap;
+  src: url("fuentes/alegreya-italic-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+
+:root {
+  --cartel: #16181D;           /* chapa esmaltada */
+  --cartel-texto: #FFFFFF;
+  --cartel-suave: #B4B7BF;
+  --anden: #F7F7F4;            /* azulejo blanco frío */
+  --tinta: #16181D;
+  --tinta-suave: #50535B;
+  --junta: #DCDCD6;            /* la junta entre azulejos */
+  --papel-lector: #FBFBF9;
+  --linea: #16181D;            /* color de la línea en curso; lo pisa cada cuaderno */
+  --linea-tinta: #FFFFFF;
+  --marco: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --lectura: "Alegreya", Georgia, serif;
+  --salida: cubic-bezier(0.16, 1, 0.3, 1);
+  --seguro-arriba: env(safe-area-inset-top, 0px);
+  --seguro-abajo: env(safe-area-inset-bottom, 0px);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --anden: #121418; --tinta: #ECEBE6; --tinta-suave: #A3A6AD; --junta: #2A2D33; --papel-lector: #15171B; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] { --anden: #121418; --tinta: #ECEBE6; --tinta-suave: #A3A6AD; --junta: #2A2D33; --papel-lector: #15171B; color-scheme: dark; }
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  background: var(--cartel); color: var(--tinta); font-family: var(--marco);
+  overflow: hidden; overscroll-behavior: none; -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+}
+::selection { background: var(--linea); color: var(--linea-tinta); }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; text-align: inherit; }
+:focus-visible { outline: 3px solid var(--linea); outline-offset: 3px; }
+img { display: block; max-width: 100%; }
+.oculto { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* ---------- El libro: hojas apiladas, sólo una a la vista ---------- */
+.libro { position: fixed; inset: 0; perspective: 2400px; background: var(--anden); touch-action: none; user-select: none; -webkit-user-select: none; }
+.hoja { position: absolute; inset: 0; background: var(--anden); overflow: hidden; display: flex; flex-direction: column; }
+.hoja[hidden] { display: none; }
+
+/* ---------- Cartel de estación (tapa) ---------- */
+.cartel { background: var(--cartel); color: var(--cartel-texto); padding: calc(var(--seguro-arriba) + 14px) 18px 14px; display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; align-items: end; flex: none; }
+.cartel .calco { height: 116px; width: auto; filter: drop-shadow(0 2px 3px rgb(0 0 0 / 0.35)); transform: rotate(-2deg); margin: 4px 0 -2px -4px; }
+.cartel .datos { font-variant-numeric: tabular-nums; padding-bottom: 6px; }
+.cartel .hora { font-size: 30px; font-weight: 760; font-stretch: 86%; line-height: 1; letter-spacing: -0.01em; }
+.cartel .dia { font-size: 14px; font-weight: 500; color: var(--cartel-suave); margin-top: 6px; }
+.cartel .cuenta { font-size: 14px; font-weight: 500; color: var(--cartel-suave); }
+.insignias { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+
+/* Insignia de línea: el círculo con la letra, como en el subte */
+.insignia { --tam: 26px; width: var(--tam); height: var(--tam); border-radius: 50%; flex: none; display: inline-grid; place-items: center;
+  background: var(--c); color: var(--t); font-family: var(--marco); font-weight: 800; font-size: calc(var(--tam) * 0.46); font-stretch: 90%; line-height: 1; letter-spacing: -0.02em; }
+.insignia.grande { --tam: 27px; }
+.insignias button.insignia { transition: transform 160ms var(--salida); }
+.insignias button.insignia:active { transform: scale(0.9); }
+
+/* Friso: la franja de color de la línea, como en las paredes del andén */
+.friso { height: 10px; background: var(--c, var(--linea)); flex: none; }
+
+/* ---------- Piezas: una nota dentro de una hoja ---------- */
+.pieza { position: relative; display: flex; flex-direction: column; min-height: 0; background: var(--anden); width: 100%; }
+.pieza .foto { position: relative; flex: 1 1 auto; min-height: 120px; overflow: hidden; background: var(--junta); }
+.pieza .foto img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.pieza .texto { padding: 14px 18px 16px; flex: none; }
+.pieza h2 { font-weight: 720; font-stretch: 90%; letter-spacing: -0.015em; line-height: 1.06; text-wrap: balance; font-size: var(--t-titulo, 25px); }
+.pieza .bajada { font-family: var(--lectura); font-size: 17px; line-height: 1.4; color: var(--tinta-suave); margin-top: 8px; text-wrap: pretty; }
+.pieza .pie { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.pieza .pie .insignia { --tam: 22px; }
+.pieza .pie .gris { color: var(--tinta-suave); font-weight: 500; }
+.pieza .pie .medias { color: var(--tinta-suave); font-weight: 500; }
+.pieza .abrir { position: absolute; inset: 0; z-index: 1; }
+.pieza .abrir:focus-visible { outline-offset: -4px; }
+.pieza.sin-foto .texto { padding-top: 16px; }
+.pieza + .pieza { border-top: 1px solid var(--junta); }
+
+/* Tamaño del título según lo que tiene que decir: los títulos son del medio y no se cortan */
+.pieza[data-largo="corto"] { --t-titulo: 30px; }
+.pieza[data-largo="medio"] { --t-titulo: 25px; }
+.pieza[data-largo="largo"] { --t-titulo: 21px; }
+.pieza.chica[data-largo] { --t-titulo: 19px; }
+.pieza.chica .bajada { display: none; }
+.pieza.principal[data-largo="corto"] { --t-titulo: 38px; }
+.pieza.principal[data-largo="medio"] { --t-titulo: 31px; }
+.pieza.principal[data-largo="largo"] { --t-titulo: 26px; }
+
+/* ---------- Apertura de cuaderno: la pantalla entera del color de la línea ---------- */
+.apertura { background: var(--c); color: var(--t); padding: calc(var(--seguro-arriba) + 28px) 24px 24px; }
+.apertura .placa { display: flex; align-items: center; gap: 14px; }
+.apertura .placa .insignia { --tam: 64px; background: var(--t); color: var(--c); font-size: 30px; }
+.apertura h2 { font-size: clamp(34px, 9vw, 64px); font-weight: 780; font-stretch: 84%; line-height: 0.96; letter-spacing: -0.02em; text-wrap: balance; }
+.apertura .resumen { font-size: 15px; font-weight: 550; margin-top: 10px; font-variant-numeric: tabular-nums; opacity: 0.85; }
+.apertura .estaciones { list-style: none; margin-top: 28px; position: relative; padding-left: 34px; flex: 1; min-height: 0; overflow: hidden; }
+.apertura .estaciones::before { content: ""; position: absolute; left: 10px; top: 10px; bottom: 10px; width: 5px; background: var(--t); border-radius: 3px; }
+.apertura .estaciones li { position: relative; }
+.apertura .estaciones button { display: block; width: 100%; padding: 7px 0; font-size: 17px; font-weight: 600; line-height: 1.22; text-wrap: pretty; }
+.apertura .estaciones li::before { content: ""; position: absolute; left: -30px; top: 9px; width: 17px; height: 17px; border-radius: 50%; background: var(--c); border: 4px solid var(--t); box-sizing: border-box; }
+.apertura .estaciones li.leida::before { background: var(--t); }
+.apertura .estaciones li.a-medias::before { background: linear-gradient(90deg, var(--t) 50%, var(--c) 50%); }
+
+/* ---------- Fin de la línea ---------- */
+.terminal { background: var(--cartel); color: var(--cartel-texto); justify-content: center; align-items: flex-start; padding: 32px 28px; gap: 14px; }
+.terminal h2 { font-size: clamp(40px, 11vw, 80px); font-weight: 780; font-stretch: 82%; line-height: 0.94; letter-spacing: -0.02em; }
+.terminal p { font-size: 17px; color: var(--cartel-suave); max-width: 32ch; line-height: 1.4; }
+.terminal .volver { margin-top: 10px; background: var(--cartel-texto); color: var(--cartel); font-weight: 700; font-size: 16px; padding: 14px 20px; border-radius: 999px; }
+
+/* ---------- Recorrido: la línea al pie que avanza una estación por hoja ---------- */
+.recorrido { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; background: var(--anden); border-top: 1px solid var(--junta);
+  padding: 12px 18px calc(var(--seguro-abajo) + 10px); pointer-events: none; transition: transform 300ms var(--salida); }
+.recorrido.sobre-color { transform: translateY(100%); }
+.via { position: relative; height: 16px; margin: 0 8px; }
+.via .riel { position: absolute; left: 0; right: 0; top: 6px; height: 4px; border-radius: 2px; background: var(--linea); }
+.via .riel.combinacion { background: var(--combinacion); }
+.via .estacion { position: absolute; top: 1px; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: var(--anden); border: 3px solid var(--tinta); transition: transform 300ms var(--salida); }
+.via .estacion.leida { background: var(--tinta); }
+.via .estacion.a-medias { background: linear-gradient(90deg, var(--tinta) 50%, var(--anden) 50%); }
+.via .estacion.aca { transform: scale(1.45); background: var(--tinta); box-shadow: 0 0 0 3px var(--anden); }
+.recorrido .leyenda { display: flex; justify-content: space-between; gap: 12px; margin-top: 8px; font-size: 12.5px; font-weight: 600; color: var(--tinta-suave); font-variant-numeric: tabular-nums; }
+.recorrido .leyenda b { color: var(--tinta); font-weight: 700; }
+
+/* Las hojas dejan lugar al recorrido */
+.hoja.con-recorrido { padding-bottom: calc(var(--seguro-abajo) + 62px); }
+
+/* ---------- Plantillas de hoja: teléfono ---------- */
+.hoja.una .pieza { flex: 1; }
+.hoja.dos .pieza { flex: 1 1 0; }
+.hoja.dos .pieza .foto { min-height: 140px; }
+.hoja.tres .pieza:first-child { flex: 1 1 auto; }
+.hoja.tres .pieza.chica { flex: none; }
+.hoja.tres .pieza.chica .texto { padding: 12px 18px 12px; }
+.hoja.tapa .pieza { flex: 1; }
+html:not(.tableta) .hoja.tapa .pieza .foto { min-height: 200px; }
+
+/* ---------- Teléfono acostado: las piezas se ponen de costado ---------- */
+.horizontal:not(.tableta) .hoja.dos, .horizontal:not(.tableta) .hoja.tres { flex-direction: row; }
+.horizontal:not(.tableta) .hoja.dos .pieza + .pieza, .horizontal:not(.tableta) .hoja.tres .pieza + .pieza { border-top: 0; border-left: 1px solid var(--junta); }
+.horizontal:not(.tableta) .pieza.principal { flex-direction: row; }
+.horizontal:not(.tableta) .pieza.principal .foto { flex: 0 0 52%; }
+.horizontal:not(.tableta) .pieza.principal .texto { flex: 1; align-self: center; }
+.horizontal:not(.tableta) .hoja.tapa { display: grid; grid-template-columns: 38% 1fr; grid-template-rows: 1fr auto; }
+.horizontal:not(.tableta) .hoja.tapa .cartel { grid-row: 1 / 3; align-content: center; }
+.horizontal:not(.tableta) .hoja.tapa .friso { display: none; }
+.horizontal:not(.tableta) .hoja.tapa .pieza { grid-row: 1 / 3; }
+
+/* ---------- El pliegue: la hoja que se dobla ---------- */
+.pliegue { position: absolute; inset: 0; z-index: 4; pointer-events: none; transform-style: preserve-3d; }
+.mitad { position: absolute; overflow: hidden; backface-visibility: hidden; -webkit-backface-visibility: hidden; transform-style: preserve-3d; }
+.mitad > .hoja { display: flex !important; }
+.mitad .sombra { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; z-index: 3; }
+.hojeador { position: absolute; transform-style: preserve-3d; will-change: transform; z-index: 3; }
+.hojeador .dorso { transform: rotateX(180deg); }
+.horizontal .hojeador .dorso { transform: rotateY(180deg); }
+
+/* ---------- Lector ---------- */
+.lector { position: fixed; inset: 0; z-index: 10; background: var(--papel-lector); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+  transform: translateY(100%); transition: transform 420ms var(--salida); visibility: hidden; }
+.lector.abierto { transform: none; visibility: visible; }
+.lector .barra { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 10px; padding: calc(var(--seguro-arriba) + 10px) 12px 10px 18px;
+  background: var(--cartel); color: var(--cartel-texto); font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.lector .barra .medio { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lector .barra .medio span { color: var(--cartel-suave); font-weight: 500; }
+.lector .barra .cerrar { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; }
+.lector .barra .cerrar:active { background: rgb(255 255 255 / 0.12); }
+.lector .barra svg { width: 22px; height: 22px; stroke: currentColor; stroke-width: 2.2; fill: none; stroke-linecap: round; }
+.lector article { max-width: 680px; margin: 0 auto; padding: 26px 20px 40px; }
+.lector h1 { font-weight: 740; font-stretch: 90%; font-size: clamp(28px, 6.6vw, 44px); line-height: 1.04; letter-spacing: -0.018em; text-wrap: balance; }
+.lector .bajada { font-family: var(--lectura); font-size: clamp(19px, 4.6vw, 23px); line-height: 1.38; color: var(--tinta-suave); margin-top: 14px; text-wrap: pretty; }
+.lector .firma { margin-top: 16px; font-size: 13.5px; font-weight: 600; color: var(--tinta-suave); font-variant-numeric: tabular-nums; }
+.lector .principal { margin: 22px -20px 0; aspect-ratio: 3 / 2; width: calc(100% + 40px); object-fit: cover; background: var(--junta); }
+.lector .medias { margin-top: 22px; padding: 14px 16px; background: var(--anden); border: 1px solid var(--junta); font-size: 15px; line-height: 1.45; }
+.lector .medias b { font-weight: 700; }
+.lector .cuerpo { font-family: var(--lectura); font-size: 20px; line-height: 1.6; margin-top: 26px; hanging-punctuation: first; }
+.lector .cuerpo p { margin: 0 0 1em; text-wrap: pretty; }
+.lector .cuerpo h2, .lector .cuerpo h3, .lector .cuerpo h4 { font-family: var(--marco); font-stretch: 92%; font-weight: 720; font-size: 22px; line-height: 1.2; margin: 1.7em 0 0.5em; }
+.lector .cuerpo a { color: inherit; text-decoration-color: var(--linea); text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.lector .cuerpo figure { margin: 1.6em -20px; }
+.lector .cuerpo figure img, .lector .cuerpo > img { width: 100%; height: auto; background: var(--junta); }
+.lector .cuerpo > img { margin: 1.6em 0; }
+.lector .cuerpo figcaption { font-family: var(--marco); font-size: 13.5px; line-height: 1.4; color: var(--tinta-suave); padding: 8px 20px 0; }
+.lector .cuerpo blockquote { margin: 1.5em 0; font-style: italic; font-size: 22px; line-height: 1.45; }
+.lector .cuerpo blockquote::before { content: "“"; display: block; font-family: var(--marco); font-style: normal; font-weight: 800; font-size: 54px; line-height: 0.6; color: var(--linea); margin-bottom: 6px; }
+.lector .cuerpo ul, .lector .cuerpo ol { margin: 0 0 1em 1.2em; }
+.lector .cuerpo li { margin-bottom: 0.4em; }
+.lector .cuerpo table { width: 100%; border-collapse: collapse; font-family: var(--marco); font-size: 15px; font-variant-numeric: tabular-nums; }
+.lector .cuerpo td, .lector .cuerpo th { border-bottom: 1px solid var(--junta); padding: 6px 4px; text-align: left; }
+.lector .cierre { max-width: 680px; margin: 0 auto; padding: 0 20px calc(var(--seguro-abajo) + 40px); }
+.lector .original { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; color: var(--tinta); text-decoration: none; padding: 12px 0; }
+.lector .original svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 2.2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.lector .proxima { display: block; width: 100%; margin-top: 18px; background: var(--linea); color: var(--linea-tinta); padding: 18px 20px; }
+.lector .proxima small { display: block; font-size: 13px; font-weight: 600; opacity: 0.85; }
+.lector .proxima span { display: block; font-size: 19px; font-weight: 700; font-stretch: 92%; line-height: 1.2; margin-top: 4px; }
+
+/* ---------- Tableta: el cartel se vuelve franja y la hoja se recompone ---------- */
+.tableta .cartel { grid-template-columns: auto auto 1fr; align-items: center; padding: calc(var(--seguro-arriba) + 14px) 28px 14px; }
+.tableta .cartel .calco { height: 104px; }
+.tableta .cartel .insignias { grid-column: auto; justify-content: flex-end; margin: 0; }
+.tableta .insignia.grande { --tam: 38px; }
+.tableta .grilla { flex: 1; min-height: 0; display: grid; gap: 1px; background: var(--junta); }
+.tableta .grilla .pieza { min-height: 0; }
+.tableta .grilla.mosaico { grid-template-columns: 1.7fr 1fr; grid-template-rows: 1fr 1fr; }
+.tableta .grilla.mosaico .pieza:first-child { grid-row: 1 / 3; }
+.tableta .grilla.trio { grid-template-columns: repeat(3, 1fr); }
+.tableta .grilla.cuatro { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+.tableta .grilla.vertical { grid-template-columns: 1fr 1fr; grid-template-rows: 1.5fr 1fr; }
+.tableta .grilla.vertical .pieza:first-child { grid-column: 1 / 3; }
+.tableta .pieza .texto { padding: 16px 22px 18px; }
+.tableta .pieza[data-largo="corto"] { --t-titulo: 30px; }
+.tableta .pieza[data-largo="medio"] { --t-titulo: 26px; }
+.tableta .pieza[data-largo="largo"] { --t-titulo: 22px; }
+.tableta .pieza.principal[data-largo="corto"] { --t-titulo: 46px; }
+.tableta .pieza.principal[data-largo="medio"] { --t-titulo: 38px; }
+.tableta .pieza.principal[data-largo="largo"] { --t-titulo: 32px; }
+.tableta .pieza + .pieza { border-top: 0; }
+.tableta .apertura { flex-direction: row; gap: 48px; padding: calc(var(--seguro-arriba) + 48px) 56px 48px; }
+.tableta .apertura .encabezado { flex: 0 0 38%; }
+.tableta .apertura h2 { font-size: clamp(48px, 6vw, 92px); margin-top: 22px; }
+.tableta .apertura .estaciones { margin-top: 0; columns: 1; }
+.tableta .apertura .estaciones button { font-size: 19px; padding: 9px 0; }
+.tableta .recorrido { padding-left: 28px; padding-right: 28px; }
+.tableta .lector .principal { margin-left: 0; margin-right: 0; width: 100%; }
+.tableta .lector .cuerpo figure { margin-left: 0; margin-right: 0; }
+.tableta .lector .cuerpo figcaption { padding-left: 0; padding-right: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lector, .recorrido, .via .estacion { transition: none; }
+}
+
+/* Tableta parada: la primera nota arriba a todo el ancho y dos debajo */
+.tableta:not(.horizontal) .grilla.mosaico, .tableta:not(.horizontal) .grilla.trio { grid-template-columns: 1fr 1fr; grid-template-rows: 1.5fr 1fr; }
+.tableta:not(.horizontal) .grilla.mosaico .pieza:first-child, .tableta:not(.horizontal) .grilla.trio .pieza:first-child { grid-column: 1 / 3; grid-row: auto; }
+
+/* En la tableta, la bajada va donde hay lugar para leerla: la principal y las columnas del trío */
+.tableta .grilla .pieza:not(.principal) .bajada { display: none; }
+.tableta .grilla.trio .pieza .bajada { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; }
+.pieza.principal .bajada { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; }
+
+/* Hojas de tableta con una o dos notas */
+.tableta .grilla.una { grid-template-columns: 1fr; }
+.tableta.horizontal .grilla.una .pieza { flex-direction: row; }
+.tableta.horizontal .grilla.una .pieza .foto { flex: 0 0 60%; }
+.tableta.horizontal .grilla.una .pieza .texto { flex: 1; align-self: center; padding: 32px 36px; }
+.tableta .grilla.par { grid-template-columns: 1fr 1fr; }
+.tableta:not(.horizontal) .grilla.par { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+.tableta:not(.horizontal) .insignia.grande { --tam: 33px; }
+.tableta:not(.horizontal) .insignias { flex-wrap: nowrap; }
+
+/* Ajustes tras la primera revisión */
+.lector .principal { max-width: none; }
+.lector .barra a { color: inherit; }
+.apertura .estaciones button { font-size: 16px; padding: 6px 0; }
+.apertura .estaciones button span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.tableta .apertura .estaciones button { font-size: 19px; padding: 8px 0; }

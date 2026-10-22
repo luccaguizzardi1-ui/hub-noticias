@@ -2,10 +2,16 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "app",
+      "runtimeExecutable": "/Users/luccaguizzardi/hub-noticias/.venv/bin/python",
+      "runtimeArgs": ["-m", "http.server", "8770", "--directory", "/Users/luccaguizzardi/hub-noticias/app"],
+      "port": 8770
+    },
+    {
       "name": "informes",
       "runtimeExecutable": "/Users/luccaguizzardi/hub-noticias/.venv/bin/python",
-      "runtimeArgs": ["-m", "http.server", "8765", "--directory", "/Users/luccaguizzardi/hub-noticias/informes"],
-      "port": 8765
+      "runtimeArgs": ["-m", "http.server", "8767", "--directory", "/Users/luccaguizzardi/hub-noticias/informes"],
+      "port": 8767
     }
   ]
 }
