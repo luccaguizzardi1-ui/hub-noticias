@@ -673,6 +673,7 @@ function medir() {
 }
 
 function rearmar(conservar) {
+  if (!estado.edicion) return;  // todavía en la pantalla de la clave
   const { modo, orientacion } = medir();
   if (modo === estado.modo && orientacion === estado.orientacion) return;
   const notaActual = conservar && estado.hojas[estado.actual] && estado.hojas[estado.actual].notas[0];
@@ -842,9 +843,12 @@ async function iniciar() {
   // Con la app abierta, cada 5 minutos y al volver a ella se fija si hay edición nueva.
   setInterval(revisarEdicion, 5 * 60 * 1000);
   document.addEventListener("visibilitychange", revisarEdicion);
-  if ("serviceWorker" in navigator && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") {
-    navigator.serviceWorker.register("sw.js").catch(() => {});
-  }
+}
+
+// El service worker se registra de entrada (también con la pantalla de la clave abierta),
+// para que la app quede guardada en el equipo desde la primera visita. En la Mac no.
+if ("serviceWorker" in navigator && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
 }
 
 iniciar().catch((err) => {
