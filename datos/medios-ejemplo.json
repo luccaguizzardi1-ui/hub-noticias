@@ -1,0 +1,12 @@
+[
+ {"id": "clarin", "nombre": "Clarín", "web": "https://www.clarin.com", "feed": "https://www.clarin.com/rss/lo-ultimo/"},
+ {"id": "lanacion", "nombre": "La Nación", "web": "https://www.lanacion.com.ar"},
+ {"id": "infobae", "nombre": "Infobae", "web": "https://www.infobae.com"},
+ {"id": "pagina12", "nombre": "Página/12", "web": "https://www.pagina12.com.ar"},
+ {"id": "losandes", "nombre": "Los Andes", "web": "https://www.losandes.com.ar"},
+ {"id": "mdz", "nombre": "MDZ", "web": "https://www.mdzol.com"},
+ {"id": "lavoz", "nombre": "La Voz", "web": "https://www.lavoz.com.ar"},
+ {"id": "ole", "nombre": "Olé", "web": "https://www.ole.com.ar"},
+ {"id": "elpais", "nombre": "El País", "web": "https://elpais.com", "feed": "https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/portada"},
+ {"id": "bbcmundo", "nombre": "BBC Mundo", "web": "https://www.bbc.com/mundo", "feed": "https://feeds.bbci.co.uk/mundo/rss.xml"}
+]

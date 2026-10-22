@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "informes",
+      "runtimeExecutable": "/Users/luccaguizzardi/hub-noticias/.venv/bin/python",
+      "runtimeArgs": ["-m", "http.server", "8765", "--directory", "/Users/luccaguizzardi/hub-noticias/informes"],
+      "port": 8765
+    }
+  ]
+}

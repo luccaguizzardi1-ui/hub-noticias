@@ -1,0 +1,31 @@
+# Corre la prueba de extracción desde los servidores de GitHub, que son los mismos
+# desde donde va a trabajar el motor. Sirve para ver qué medios bloquean la nube.
+name: Prueba de extracción
+
+on:
+  workflow_dispatch:
+    inputs:
+      notas:
+        description: Notas a probar por medio
+        default: "4"
+      medios:
+        description: Archivo de medios
+        default: datos/medios.json
+
+jobs:
+  prueba:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python motor/prueba.py --medios "${{ inputs.medios }}" --notas "${{ inputs.notas }}" --origen "GitHub Actions"
+      # Sólo los números: el informe con el texto de las notas no se sube.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prueba-extraccion
+          path: informes/prueba-extraccion.json

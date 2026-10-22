@@ -1,0 +1,75 @@
+[
+ {
+  "id": "elpais",
+  "nombre": "El País",
+  "pais": "España",
+  "web": "https://elpais.com",
+  "feed": "https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/portada"
+ },
+ {
+  "id": "bbcmundo",
+  "nombre": "BBC Mundo",
+  "pais": "Reino Unido",
+  "web": "https://www.bbc.com/mundo",
+  "feed": "https://feeds.bbci.co.uk/mundo/rss.xml"
+ },
+ {
+  "id": "elmundo",
+  "nombre": "El Mundo",
+  "pais": "España",
+  "web": "https://www.elmundo.es",
+  "feed": "https://e00-elmundo.uecdn.es/elmundo/rss/portada.xml"
+ },
+ {
+  "id": "cnnespanol",
+  "nombre": "CNN en Español",
+  "pais": "Estados Unidos",
+  "web": "https://cnnespanol.cnn.com"
+ },
+ {
+  "id": "infobae",
+  "nombre": "Infobae",
+  "pais": "Argentina",
+  "web": "https://www.infobae.com"
+ },
+ {
+  "id": "eldoce",
+  "nombre": "El Doce",
+  "pais": "Argentina",
+  "web": "https://eldoce.tv",
+  "feed": "https://eldoce.tv/arc/outboundfeeds/rss/?outputType=xml"
+ },
+ {
+  "id": "lanacion",
+  "nombre": "La Nación",
+  "pais": "Argentina",
+  "web": "https://www.lanacion.com.ar"
+ },
+ {
+  "id": "pagina12",
+  "nombre": "Página/12",
+  "pais": "Argentina",
+  "web": "https://www.pagina12.com.ar"
+ },
+ {
+  "id": "perfil",
+  "nombre": "Perfil",
+  "pais": "Argentina",
+  "web": "https://www.perfil.com",
+  "feed": "https://www.perfil.com/feed"
+ },
+ {
+  "id": "tn",
+  "nombre": "Todo Noticias",
+  "pais": "Argentina",
+  "web": "https://tn.com.ar",
+  "feed": "https://tn.com.ar/arc/outboundfeeds/rss/?outputType=xml"
+ },
+ {
+  "id": "eldiplo",
+  "nombre": "Le Monde Diplomatique – Cono Sur",
+  "pais": "Argentina",
+  "web": "https://www.eldiplo.org",
+  "sitemap": "https://www.eldiplo.org/wp-sitemap-posts-post-4.xml"
+ }
+]

@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+informes/
+.DS_Store
+# Skills y hooks de diseño instalados localmente (se reinstalan con npx impeccable install)
+.claude/skills/
+.claude/agents/
+.claude/settings.local.json
+.env
