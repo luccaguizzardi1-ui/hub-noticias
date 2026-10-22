@@ -213,6 +213,22 @@ def _desde_feed(nota, item, motivo):
     return nota
 
 
+def solo_comienzo(url, item):
+    """Medios que elegimos dejar a medias (El País bloquea a la nube): título, bajada,
+    foto y el comienzo que manda el RSS, con el link para seguir leyendo en su web.
+    No se pide la página."""
+    cuerpo = item.get("contenido") or (f"<p>{html.escape(item['bajada'])}</p>" if item.get("bajada") else "")
+    return {
+        "url": url, "url_final": url, "estado_http": None, "error": None,
+        "titulo": item.get("titulo", ""), "bajada": item.get("bajada", ""), "autor": "",
+        "fecha": item.get("fecha") or "", "foto": item.get("foto", ""), "extractor": "rss",
+        "palabras": palabras(texto_de(cuerpo)), "palabras_medio": 0, "muro": False,
+        "parrafos": len(re.findall(r"<p[\s>]", cuerpo)), "fotos_cuerpo": len(re.findall(r"<img\b", cuerpo)),
+        "cuerpo_html": cuerpo, "a_medias": True,
+        "veredicto": "parcial", "motivo": "a medias por elección: título, comienzo y link a su web",
+    }
+
+
 def extraer(url, item=None):
     item = item or {}
     r = bajar(url)

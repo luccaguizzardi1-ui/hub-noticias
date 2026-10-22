@@ -19,7 +19,7 @@ from pathlib import Path
 from urllib.parse import urljoin
 
 sys.path.insert(0, str(Path(__file__).parent))
-from extraer import extraer  # noqa: E402
+from extraer import extraer, solo_comienzo  # noqa: E402
 from fuentes import descubrir, link_real  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -37,7 +37,7 @@ def probar_medio(medio, n):
             res["notas"].append({"url": item["link"], "titulo": item["titulo"],
                                  "veredicto": "falló", "motivo": "no se pudo traducir el link de Google News"})
             continue
-        nota = extraer(link, item)
+        nota = solo_comienzo(link, item) if medio.get("a_medias") else extraer(link, item)
         nota["titulo"] = nota.get("titulo") or item["titulo"]
         res["notas"].append(nota)
 

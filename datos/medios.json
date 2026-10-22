@@ -4,7 +4,8 @@
   "nombre": "El País",
   "pais": "España",
   "web": "https://elpais.com",
-  "feed": "https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/portada"
+  "feed": "https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/portada",
+  "a_medias": true
  },
  {
   "id": "bbcmundo",
