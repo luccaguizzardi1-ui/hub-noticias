@@ -35,7 +35,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--salida", default=str(ROOT / "_site"))
     ap.add_argument("--anterior", default="")
-    ap.add_argument("--por-medio", type=int, default=12)
+    ap.add_argument("--por-medio", type=int, default=10)
     args = ap.parse_args()
 
     frase = os.environ.get("DIARIO_CLAVE", "")
@@ -67,8 +67,9 @@ def main():
         sw.write_text(sw.read_text().replace("__VERSION_APP__", huella_app()))
     (salida / ".nojekyll").write_text("")
     a_medias = sum(n["a_medias"] for n in edicion["notas"])
-    print(f'Publicado: {len(edicion["notas"])} notas de {len(edicion["cuadernos"])} medios ({a_medias} a medias), '
+    print(f'Publicado: {len(edicion["notas"])} notas de {len(edicion["medios"])} medios ({a_medias} a medias), '
           f'{(salida / "edicion.cifrada.json").stat().st_size // 1024} KB cifrados')
+    print("Secciones: " + ", ".join(f'{s["nombre"]} {len(s["notas"])}' for s in edicion["secciones"]))
 
 
 if __name__ == "__main__":

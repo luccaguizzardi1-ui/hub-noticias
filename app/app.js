@@ -1,27 +1,42 @@
-/* el diario del pelado: arma las hojas de la edición, el pliegue para pasarlas,
-   la línea de recorrido y el lector. Sin dependencias. */
+/* el diario del pelado: arma las hojas de la edición por secciones, el pliegue para
+   pasarlas, la línea de recorrido, el índice, el lector y lo que guardás. Sin dependencias. */
 "use strict";
 
 const libro = document.getElementById("libro");
 const recorrido = document.getElementById("recorrido");
 const lector = document.getElementById("lector");
 const aviso = document.getElementById("aviso");
+const indice = document.getElementById("indice");
+const indiceBoton = document.getElementById("indice-boton");
+const panel = document.getElementById("guardadas");
+const hojitaTarde = document.getElementById("mas-tarde");
+const botonDestacar = document.getElementById("destacar");
+const chipFiltro = document.getElementById("filtro");
+const toast = document.getElementById("toast");
 
 const estado = {
   edicion: null,
   medios: new Map(),
   notas: new Map(),
+  secciones: [],  // las de la edición, ya filtradas por medio si hay filtro
   hojas: [],      // { el, seccion, notas: [ids] }
   actual: 0,
   modo: "",       // "telefono" | "tableta"
   orientacion: "",
+  filtro: null,   // id de un medio: la edición sólo con ese medio
   leidas: new Set(),
+  biblioteca: new Map(),  // notas guardadas, para más tarde y con destacados (en este equipo)
+  notaAbierta: null,
   ocupado: false,
 };
 
 const reducido = matchMedia("(prefers-reduced-motion: reduce)");
 const horaFmt = new Intl.DateTimeFormat("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false });
 const diaFmt = new Intl.DateTimeFormat("es-AR", { weekday: "long", day: "numeric", month: "long" });
+const ICONO = {
+  flecha: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
+  externo: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>',
+};
 
 /* ---------- memoria del lector (sólo en este dispositivo) ---------- */
 function leerMemoria(clave, porDefecto) {
@@ -42,8 +57,7 @@ function hora(iso) {
   if (!iso) return "";
   const d = new Date(iso);
   if (isNaN(d)) return "";
-  const hoy = new Date();
-  const mismoDia = d.toDateString() === hoy.toDateString();
+  const mismoDia = d.toDateString() === new Date().toDateString();
   return mismoDia ? horaFmt.format(d) : `${diaFmt.format(d).split(",")[0]} ${horaFmt.format(d)}`;
 }
 function largo(titulo) {
@@ -71,6 +85,69 @@ function trozos(lista, patron) {
   }
   return hojas;
 }
+let esperaToast = 0;
+function avisar(texto) {
+  toast.textContent = texto;
+  toast.classList.add("visible");
+  clearTimeout(esperaToast);
+  esperaToast = setTimeout(() => toast.classList.remove("visible"), 2800);
+}
+function textoPlano(html) {
+  const doc = new DOMParser().parseFromString(`<div>${html}</div>`, "text/html");
+  const partes = [...doc.body.querySelectorAll("p, h2, h3, h4, li, blockquote, figcaption")]
+    .filter((n) => !n.parentElement.closest("p, li, blockquote"))
+    .map((n) => n.textContent.replace(/\s+/g, " ").trim()).filter(Boolean);
+  return partes.length ? partes.join("\n\n") : doc.body.textContent.trim();
+}
+
+// Una nota y su medio, de la edición o de lo que guardaste (que puede ser de otra edición).
+function notaPorId(id) {
+  return estado.notas.get(id) || estado.biblioteca.get(id)?.nota || null;
+}
+function medioDe(nota) {
+  return estado.medios.get(nota.medio) || estado.biblioteca.get(nota.id)?.medio;
+}
+
+/* ---------- la biblioteca: guardadas, para más tarde y destacados (IndexedDB) ---------- */
+function abrirBase() {
+  return new Promise((ok, mal) => {
+    const r = indexedDB.open("diario-del-pelado", 2);
+    r.onupgradeneeded = () => {
+      const db = r.result;
+      if (!db.objectStoreNames.contains("claves")) db.createObjectStore("claves");
+      if (!db.objectStoreNames.contains("biblioteca")) db.createObjectStore("biblioteca", { keyPath: "id" });
+    };
+    r.onsuccess = () => ok(r.result);
+    r.onerror = () => mal(r.error);
+  });
+}
+async function cargarBiblioteca() {
+  try {
+    const db = await abrirBase();
+    const todos = await new Promise((ok) => {
+      const r = db.transaction("biblioteca").objectStore("biblioteca").getAll();
+      r.onsuccess = () => ok(r.result || []);
+      r.onerror = () => ok([]);
+    });
+    estado.biblioteca = new Map(todos.map((x) => [x.id, x]));
+  } catch { estado.biblioteca = new Map(); }
+}
+async function persistir(registro) {
+  const vacio = !registro.guardada && !registro.masTarde && !registro.destacados.length;
+  if (vacio) estado.biblioteca.delete(registro.id); else estado.biblioteca.set(registro.id, registro);
+  try {
+    const db = await abrirBase();
+    const almacen = db.transaction("biblioteca", "readwrite").objectStore("biblioteca");
+    if (vacio) almacen.delete(registro.id); else almacen.put(registro);
+  } catch { avisar("No se pudo guardar en este equipo"); }
+}
+function registroDe(id) {
+  const existente = estado.biblioteca.get(id);
+  if (existente) return existente;
+  const nota = notaPorId(id);
+  const m = medioDe(nota);
+  return { id, nota, medio: { id: m.id, nombre: m.nombre, linea: m.linea }, guardada: null, masTarde: null, avisado: false, destacados: [] };
+}
 
 /* ---------- piezas ---------- */
 function pieza(id, variante) {
@@ -80,8 +157,7 @@ function pieza(id, variante) {
   p.dataset.largo = largo(n.titulo);
   p.dataset.nota = id;
   p.style.cssText = colores(m);
-  const conFoto = n.foto && variante !== "chica";
-  if (conFoto) {
+  if (n.foto && variante !== "chica") {
     const f = el("div", "foto");
     const img = el("img");
     img.src = n.foto;
@@ -130,42 +206,41 @@ function cartel() {
   const datos = el("div", "datos");
   datos.append(el("p", "hora", `Edición de las ${horaFmt.format(new Date(e.generada))}`));
   datos.append(el("p", "dia", diaFmt.format(new Date(e.generada))));
-  datos.append(el("p", "cuenta", `${e.notas.length} notas de ${e.medios.length} medios`));
-  const ins = el("div", "insignias");
-  ins.setAttribute("aria-label", "Ir al cuaderno de cada medio");
-  for (const m of e.medios) {
-    const b = el("button", "insignia grande", m.linea.letra);
-    b.type = "button";
-    b.style.cssText = colores(m);
-    b.setAttribute("aria-label", `Ir a ${m.nombre}`);
-    b.addEventListener("click", () => irA(estado.hojas.findIndex((h) => h.seccion === m.id)));
-    ins.append(b);
-  }
-  c.append(calco, datos, ins);
+  const elegido = estado.filtro && estado.medios.get(estado.filtro);
+  datos.append(el("p", "cuenta", elegido
+    ? `${e.notas.filter((n) => n.medio === elegido.id).length} notas de ${elegido.nombre}`
+    : `${e.notas.length} notas de ${e.medios.length} medios`));
+  const elegir = el("button", "elegir-medio");
+  elegir.type = "button";
+  elegir.setAttribute("aria-haspopup", "dialog");
+  elegir.setAttribute("aria-controls", "medios");
+  elegir.append(el("span", null, elegido ? `Sólo ${elegido.nombre}` : "Todos los medios"), flechita());
+  elegir.addEventListener("click", () => abrirMedios(elegir));
+  c.append(calco, datos, elegir);
   return c;
 }
 
-function hojaTapa(ids) {
-  const tableta = estado.modo === "tableta";
+function hojaTapa(ids, seccion) {
   const h = hojaBase("tapa con-recorrido", "Tapa");
   const lider = estado.medios.get(estado.notas.get(ids[0]).medio);
   const friso = el("div", "friso");
   friso.style.cssText = colores(lider);
   h.append(cartel(), friso);
-  if (tableta) {
-    const g = el("div", `grilla ${estado.orientacion === "vertical" ? "vertical" : "mosaico"}`);
+  if (estado.modo === "tableta" && ids.length > 1) {
+    const g = el("div", `grilla ${estado.orientacion === "vertical" ? "vertical" : ids.length === 2 ? "par" : "mosaico"}`);
     ids.forEach((id, i) => g.append(pieza(id, i === 0 ? "principal" : "normal")));
     h.append(g);
   } else {
     h.append(pieza(ids[0], "principal"));
   }
+  h.dataset.seccion = seccion;
   return h;
 }
 
 function hojaNotas(ids, plantilla, etiqueta, medio) {
   const h = hojaBase(`${plantilla} con-recorrido`, etiqueta);
-  // El friso de la pared del andén: el color de la línea en la que estás (la combinación en la portada).
-  // Además ocupa la franja de la hora y la isla del iPhone, para que no tapen la foto ni el título.
+  // El friso de la pared del andén: la combinación de líneas en las secciones (o la línea del
+  // medio, si filtraste). Además ocupa la franja de la hora del iPhone.
   const techo = el("div", `friso techo${medio ? "" : " combinacion"}`);
   if (medio) techo.style.cssText = colores(medio);
   h.append(techo);
@@ -182,34 +257,45 @@ function hojaNotas(ids, plantilla, etiqueta, medio) {
   return h;
 }
 
-function hojaApertura(cuaderno) {
-  const m = estado.medios.get(cuaderno.medio);
-  const h = hojaBase("apertura", `Cuaderno de ${m.nombre}`);
-  h.style.cssText = colores(m);
+// La apertura de cada sección: un cartel de estación con la lista de notas como paradas.
+// Sin filtro es la combinación (chapa oscura, cada parada con el nombre de su medio);
+// con filtro, la pantalla toma el color de la línea de ese medio.
+function hojaApertura(sec) {
+  const medio = estado.filtro ? estado.medios.get(estado.filtro) : null;
+  const h = hojaBase(`apertura${medio ? "" : " combinada"}`, sec.nombre);
+  if (medio) h.style.cssText = colores(medio);
   const enc = el("div", "encabezado");
-  const placa = el("div", "placa");
-  placa.append(insignia(m, "insignia"));
-  enc.append(placa, el("h2", null, m.nombre));
-  const ultima = estado.notas.get(cuaderno.notas[0]);
-  enc.append(el("p", "resumen", `${cuaderno.notas.length} notas · la última, ${hora(ultima.publicada || ultima.fecha)}`));
+  if (medio) {
+    const placa = el("div", "placa");
+    placa.append(insignia(medio, "insignia"));
+    enc.append(placa);
+  } else {
+    enc.append(el("div", "riel-apertura"));
+  }
+  enc.append(el("h2", null, sec.nombre));
+  const ultima = estado.notas.get(sec.notas[0]);
+  const de = medio ? medio.nombre : `${new Set(sec.notas.map((id) => estado.notas.get(id).medio)).size} medios`;
+  enc.append(el("p", "resumen", `${sec.notas.length} ${sec.notas.length === 1 ? "nota" : "notas"} de ${de} · la última, ${hora(ultima.publicada || ultima.fecha)}`));
   const lista = el("ol", "estaciones");
-  for (const id of cuaderno.notas) {
+  for (const id of sec.notas) {
     const n = estado.notas.get(id);
     const li = el("li");
     li.dataset.nota = id;
     const b = el("button");
     b.type = "button";
     b.append(el("span", null, n.titulo));
+    if (!medio) b.append(el("span", "de", estado.medios.get(n.medio).nombre));
     b.addEventListener("click", () => abrirNota(id));
     li.append(b);
     lista.append(li);
   }
   h.append(enc, lista);
+  h.dataset.seccion = sec.id;
   return h;
 }
 
 function textoFinal(hoja) {
-  const todas = estado.edicion.notas.every((n) => estado.leidas.has(n.id));
+  const todas = estado.secciones.every((s) => s.notas.every((id) => estado.leidas.has(id)));
   hoja.querySelector("p").textContent = `${todas ? "Leíste toda la edición." : "Llegaste al final de la edición."} La próxima se arma sola en unos minutos.`;
 }
 
@@ -239,30 +325,42 @@ function ajustar(plantilla, cuantas) {
   return plantilla;
 }
 
+function seccionesVisibles() {
+  const f = estado.filtro;
+  return estado.edicion.secciones
+    .map((s) => ({ ...s, notas: f ? s.notas.filter((id) => estado.notas.get(id).medio === f) : s.notas }))
+    .filter((s) => s.notas.length);
+}
+
+function idsDeTapa(secciones) {
+  const cuantas = estado.modo === "tableta" ? 3 : 1;
+  if (!estado.filtro && estado.edicion.tapa?.length) return estado.edicion.tapa.slice(0, cuantas);
+  // Con filtro (o sin tapa armada): lo más fresco con foto de las primeras secciones.
+  const candidatas = secciones.flatMap((s) => s.notas).map((id) => estado.notas.get(id));
+  const elegidas = candidatas.filter((n) => n.foto && !n.a_medias);
+  return (elegidas.length ? elegidas : candidatas).slice(0, cuantas).map((n) => n.id);
+}
+
 function armarHojas() {
-  const e = estado.edicion;
   const tableta = estado.modo === "tableta";
+  const medio = estado.filtro ? estado.medios.get(estado.filtro) : null;
   libro.replaceChildren();
   estado.hojas = [];
+  estado.secciones = seccionesVisibles();
   const sumar = (elemento, seccion, ids) => {
     libro.append(elemento);
     estado.hojas.push({ el: elemento, seccion, notas: ids });
   };
+  const tapa = idsDeTapa(estado.secciones);
+  const seccionTapa = estado.secciones.find((s) => s.notas.includes(tapa[0]))?.id || estado.secciones[0].id;
+  sumar(hojaTapa(tapa, seccionTapa), seccionTapa, tapa);
 
-  const portada = e.portada.slice();
-  const enTapa = tableta ? 3 : 1;
-  sumar(hojaTapa(portada.slice(0, enTapa)), "portada", portada.slice(0, enTapa));
-  const patronPortada = tableta ? [["mosaico", 3], ["trio", 3], ["cuatro", 4]] : [["dos", 2], ["una", 1], ["tres", 3]];
-  for (const t of trozos(portada.slice(enTapa), patronPortada)) {
-    sumar(hojaNotas(t.ids, ajustar(t.plantilla, t.ids.length), "Portada", null), "portada", t.ids);
-  }
-
-  const patronCuaderno = tableta ? [["mosaico", 3], ["cuatro", 4], ["trio", 3]] : [["una", 1], ["dos", 2], ["tres", 3]];
-  for (const c of e.cuadernos) {
-    const m = estado.medios.get(c.medio);
-    sumar(hojaApertura(c), c.medio, []);
-    for (const t of trozos(c.notas, patronCuaderno)) {
-      sumar(hojaNotas(t.ids, ajustar(t.plantilla, t.ids.length), m.nombre, m), c.medio, t.ids);
+  const patron = tableta ? [["mosaico", 3], ["cuatro", 4], ["trio", 3]] : [["dos", 2], ["una", 1], ["tres", 3]];
+  for (const sec of estado.secciones) {
+    sumar(hojaApertura(sec), sec.id, []);
+    const resto = sec.notas.filter((id) => !tapa.includes(id));
+    for (const t of trozos(resto, patron)) {
+      sumar(hojaNotas(t.ids, ajustar(t.plantilla, t.ids.length), sec.nombre, medio), sec.id, t.ids);
     }
   }
   sumar(hojaTerminal(), "fin", []);
@@ -293,19 +391,18 @@ function marcaDeHoja(h) {
   return leidas === h.notas.length ? "leida" : leidas ? "a-medias" : "";
 }
 
+function nombreSeccion(id) {
+  return estado.secciones.find((s) => s.id === id)?.nombre || "";
+}
+
 function pintarRecorrido() {
   const h = estado.hojas[estado.actual];
   const via = recorrido.querySelector(".via");
-  const sobreColor = h.seccion === "fin" || h.el.classList.contains("apertura");
-  recorrido.classList.toggle("sobre-color", sobreColor);
+  recorrido.classList.toggle("sobre-color", h.seccion === "fin" || h.el.classList.contains("apertura"));
   const deSeccion = estado.hojas.map((x, i) => ({ ...x, i })).filter((x) => x.seccion === h.seccion && x.notas.length);
   const riel = el("div", "riel");
-  if (h.seccion === "portada") {
-    riel.classList.add("combinacion");
-    recorrido.style.setProperty("--linea", "#16181D");
-  } else if (h.seccion !== "fin") {
-    recorrido.style.setProperty("--linea", estado.medios.get(h.seccion).linea.color);
-  }
+  if (estado.filtro) recorrido.style.setProperty("--linea", estado.medios.get(estado.filtro).linea.color);
+  else riel.classList.add("combinacion");
   via.replaceChildren(riel);
   deSeccion.forEach((x, k) => {
     const est = el("span", `estacion ${marcaDeHoja(x)}`);
@@ -314,24 +411,36 @@ function pintarRecorrido() {
     via.append(est);
   });
   const pos = deSeccion.findIndex((x) => x.i === estado.actual) + 1;
-  const nombre = h.seccion === "portada" ? "Portada" : h.seccion === "fin" ? "" : estado.medios.get(h.seccion).nombre;
-  recorrido.querySelector(".donde").innerHTML = "";
-  if (pos) recorrido.querySelector(".donde").append(Object.assign(el("b"), { textContent: nombre }), document.createTextNode(` · estación ${pos} de ${deSeccion.length}`));
+  const donde = recorrido.querySelector(".donde");
+  donde.replaceChildren();
+  if (pos) donde.append(Object.assign(el("b"), { textContent: nombreSeccion(h.seccion) }), document.createTextNode(` · estación ${pos} de ${deSeccion.length}`));
   const siguiente = estado.hojas.slice(estado.actual + 1).find((x) => x.seccion !== h.seccion);
-  const prox = recorrido.querySelector(".proxima-seccion");
-  prox.textContent = estado.actual === 0 ? "Pasá la hoja" : siguiente && pos === deSeccion.length && siguiente.seccion !== "fin"
-    ? `Próxima: ${estado.medios.get(siguiente.seccion).nombre}` : "";
+  recorrido.querySelector(".proxima-seccion").textContent = estado.actual === 0 ? "Pasá la hoja"
+    : siguiente && pos === deSeccion.length && siguiente.seccion !== "fin" ? `Próxima: ${nombreSeccion(siguiente.seccion)}` : "";
 }
 
 function pintarAperturas() {
-  for (const li of libro.querySelectorAll(".estaciones li")) {
+  for (const li of libro.querySelectorAll(".estaciones li[data-nota]")) {
     const id = li.dataset.nota;
-    li.classList.toggle("leida", estado.leidas.has(id) && !estado.notas.get(id).a_medias);
-    li.classList.toggle("a-medias", estado.leidas.has(id) && estado.notas.get(id).a_medias);
+    const n = estado.notas.get(id);
+    li.classList.toggle("leida", estado.leidas.has(id) && !n.a_medias);
+    li.classList.toggle("a-medias", estado.leidas.has(id) && n.a_medias);
   }
 }
 
 /* ---------- mostrar una hoja ---------- */
+// Las fotos de las hojas vecinas se cargan antes: así el pliegue nunca muestra un hueco en blanco.
+function precargar(i) {
+  for (const k of [i + 1, i - 1, i + 2]) {
+    const h = estado.hojas[k];
+    if (!h) continue;
+    for (const img of h.el.querySelectorAll("img")) {
+      if (img.loading === "lazy") img.loading = "eager";
+      img.decode?.().catch(() => {});
+    }
+  }
+}
+
 function mostrar(i) {
   i = Math.max(0, Math.min(i, estado.hojas.length - 1));
   estado.hojas.forEach((h, k) => {
@@ -344,7 +453,9 @@ function mostrar(i) {
   ajustarEstaciones(estado.hojas[i].el);
   if (estado.hojas[i].seccion === "fin") textoFinal(estado.hojas[i].el);
   pintarRecorrido();
-  guardarMemoria("posicion", { edicion: estado.edicion.generada, hoja: i, modo: estado.modo });
+  chipFiltro.classList.toggle("en-tapa", i === 0);  // en la tapa ya lo dice el cartel
+  precargar(i);
+  guardarMemoria("posicion", { edicion: estado.edicion.generada, hoja: i, modo: estado.modo, filtro: estado.filtro });
 }
 
 function irA(i) {
@@ -355,6 +466,92 @@ function irA(i) {
   }
   pasar(i > estado.actual ? 1 : -1);
 }
+
+/* ---------- filtro por medio: se elige en la lista de medios ---------- */
+function filtrar(medioId) {
+  estado.filtro = medioId;
+  estado.modo = "";  // fuerza a rearmar
+  rearmar(false);
+  mostrar(0);
+  pintarFiltro();
+}
+function pintarFiltro() {
+  const m = estado.filtro && estado.medios.get(estado.filtro);
+  chipFiltro.hidden = !m;
+  if (!m) return;
+  chipFiltro.querySelector(".texto").replaceChildren(document.createTextNode(`Sólo ${m.nombre}`), flechita());
+}
+chipFiltro.querySelector(".texto").addEventListener("click", (ev) => abrirMedios(ev.currentTarget));
+chipFiltro.querySelector(".quitar").addEventListener("click", () => filtrar(null));
+
+/* ---------- la lista de medios: un desplegable con los nombres, por grupo ---------- */
+const desplegable = document.getElementById("medios");
+const GRUPOS = [["aca", "De acá"], ["afuera", "De afuera"], ["temas", "Economía y tecnología"]];
+let abridorMedios = null;
+
+function flechita() {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-hidden", "true");
+  svg.classList.add("flechita");
+  const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  p.setAttribute("d", "M6 9l6 6 6-6");
+  svg.append(p);
+  return svg;
+}
+function abrirMedios(desde) {
+  const e = estado.edicion;
+  const cuantas = new Map();
+  for (const n of e.notas) cuantas.set(n.medio, (cuantas.get(n.medio) || 0) + 1);
+  const lista = desplegable.querySelector(".lista");
+  lista.replaceChildren();
+  const fila = (nombre, cuenta, id) => {
+    const b = el("button", "fila");
+    b.type = "button";
+    b.setAttribute("aria-pressed", String(estado.filtro === id));
+    const tilde = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    tilde.setAttribute("viewBox", "0 0 24 24");
+    tilde.setAttribute("aria-hidden", "true");
+    tilde.innerHTML = '<path d="M5 12.5l4.5 4.5L19 7.5"/>';
+    b.append(el("span", "nombre", nombre), el("span", "cuenta", `${cuenta} ${cuenta === 1 ? "nota" : "notas"}`), tilde);
+    b.addEventListener("click", () => { cerrarMedios(); if (estado.filtro !== id) filtrar(id); });
+    return b;
+  };
+  lista.append(fila("Todos los medios", e.notas.length, null));
+  const porNombre = (a, b) => a.nombre.localeCompare(b.nombre, "es");
+  const conGrupo = e.medios.some((m) => m.grupo);  // ediciones viejas: una sola lista
+  for (const [g, titulo] of conGrupo ? GRUPOS : [[null, null]]) {
+    const deEste = e.medios.filter((m) => !conGrupo || m.grupo === g).sort(porNombre);
+    if (!deEste.length) continue;
+    if (titulo) lista.append(el("h3", null, titulo));
+    for (const m of deEste) lista.append(fila(m.nombre, cuantas.get(m.id) || 0, m.id));
+  }
+  // Cuelga del botón que lo abrió; si ese botón no está a la vista, arriba de todo.
+  const caja = desplegable.querySelector(".caja");
+  const r = desde?.isConnected ? desde.getBoundingClientRect() : null;
+  const ancho = Math.min(400, innerWidth - 24);
+  // Si no entra hacia la derecha (el selector del iPad está a la derecha), se alinea con el borde derecho del botón.
+  const izq = !r || !r.width ? (innerWidth - ancho) / 2
+    : r.left + ancho <= innerWidth - 12 ? Math.max(12, r.left) : Math.max(12, r.right - ancho);
+  caja.style.width = `${ancho}px`;
+  caja.style.left = `${izq}px`;
+  caja.style.setProperty("--arriba", r && r.height ? `${r.bottom + 8}px` : "calc(var(--seguro-arriba) + 16px)");
+  abridorMedios = desde;
+  desde?.setAttribute?.("aria-expanded", "true");
+  desplegable.hidden = false;
+  lista.scrollTop = 0;
+  requestAnimationFrame(() => desplegable.classList.add("abierto"));
+  const elegida = lista.querySelector('[aria-pressed="true"]') || lista.querySelector("button");
+  elegida.focus({ preventScroll: true });
+  elegida.scrollIntoView({ block: "nearest" });  // el medio elegido, a la vista
+}
+function cerrarMedios() {
+  desplegable.classList.remove("abierto");
+  abridorMedios?.setAttribute?.("aria-expanded", "false");
+  setTimeout(() => { desplegable.hidden = true; }, 200);
+}
+desplegable.querySelector(".cerrar").addEventListener("click", cerrarMedios);
+desplegable.addEventListener("click", (ev) => { if (ev.target === desplegable) cerrarMedios(); });
 
 /* ---------- el pliegue ---------- */
 function crearPliegue(sentido) {
@@ -416,16 +613,17 @@ function crearPliegue(sentido) {
     pintar(a) {
       this.angulo = a;
       hojeador.style.transform = `${giro}(${signo * a}deg)`;
-      const t = a / 180;
       sombraFrente.style.opacity = a < 90 ? (0.38 * (a / 90)).toFixed(3) : "0";
       sombraDorso.style.opacity = a >= 90 ? (0.38 * (1 - (a - 90) / 90)).toFixed(3) : "0";
-      sombraBase.style.opacity = (0.32 * (1 - t)).toFixed(3);
+      sombraBase.style.opacity = (0.32 * (1 - a / 180)).toFixed(3);
     },
     cerrar(completo) {
-      pliegue.remove();
       if (completo) {
+        // Primero la hoja de destino queda firme y después se saca el pliegue: sin cuadro intermedio.
         mostrar(estado.actual + sentido);
+        pliegue.remove();
       } else {
+        pliegue.remove();
         destino.hidden = true;
         destino.style.zIndex = "";
         actual.style.zIndex = "";
@@ -486,17 +684,13 @@ libro.addEventListener("pointermove", (ev) => {
     libro.setPointerCapture(ev.pointerId);
     suprimirClic = true;
     const destino = estado.actual + gesto.sentido;
-    if (destino < 0 || destino >= estado.hojas.length || reducido.matches) {
-      gesto.rebote = true;
-    } else {
-      gesto.pliegue = crearPliegue(gesto.sentido);
-    }
+    if (destino < 0 || destino >= estado.hojas.length || reducido.matches) gesto.rebote = true;
+    else gesto.pliegue = crearPliegue(gesto.sentido);
   }
   if (gesto.pliegue) {
     const largoEje = horizontal ? libro.clientWidth : libro.clientHeight;
     const avance = Math.max(0, Math.min(1, (-gesto.sentido * delta) / (largoEje * 0.8)));
     gesto.pliegue.pintar(avance * 180);
-    gesto.ultimo = { delta, t: ev.timeStamp };
   }
 });
 
@@ -508,8 +702,7 @@ function soltar(ev) {
   if (!g.pliegue) return;
   const horizontal = estado.modo === "tableta";
   const delta = horizontal ? ev.clientX - g.x : ev.clientY - g.y;
-  const dt = Math.max(1, ev.timeStamp - g.t);
-  const velocidad = (-g.sentido * delta) / dt; // px por ms a favor del pase
+  const velocidad = (-g.sentido * delta) / Math.max(1, ev.timeStamp - g.t); // px por ms a favor del pase
   const completo = g.pliegue.angulo > 80 || (velocidad > 0.45 && g.pliegue.angulo > 12);
   estado.ocupado = true;
   const resto = completo ? 180 - g.pliegue.angulo : g.pliegue.angulo;
@@ -531,9 +724,18 @@ libro.addEventListener("wheel", (ev) => {
   if (Math.abs(ruedaAcumulada) > 70) { pasar(ruedaAcumulada > 0 ? 1 : -1); ruedaAcumulada = 0; }
 }, { passive: false });
 
+function capaAbierta() {
+  if (!hojitaTarde.hidden) return "tarde";
+  if (!desplegable.hidden) return "medios";
+  if (lector.classList.contains("abierto")) return "lector";
+  if (!panel.hidden) return "panel";
+  if (!indice.hidden) return "indice";
+  return null;
+}
 document.addEventListener("keydown", (ev) => {
-  if (lector.classList.contains("abierto")) {
-    if (ev.key === "Escape") cerrarNota();
+  const capa = capaAbierta();
+  if (capa) {
+    if (ev.key === "Escape") ({ tarde: cerrarHojita, medios: cerrarMedios, lector: cerrarNota, panel: cerrarPanel, indice: cerrarIndice })[capa]();
     return;
   }
   if (["ArrowDown", "ArrowRight", "PageDown", " "].includes(ev.key)) { ev.preventDefault(); pasar(1); }
@@ -579,17 +781,22 @@ function limpiarCuerpo(html, fotoPrincipal, base) {
   return raiz;
 }
 
+// La próxima nota de la misma sección (en la edición que estás viendo).
+function proximaDe(id) {
+  const sec = estado.secciones.find((s) => s.notas.includes(id));
+  return sec ? sec.notas[sec.notas.indexOf(id) + 1] : null;
+}
+
 function abrirNota(id, { sinAnimacion = false } = {}) {
-  const n = estado.notas.get(id);
-  const m = estado.medios.get(n.medio);
+  const n = notaPorId(id);
+  if (!n) return;
+  const m = medioDe(n);
+  estado.notaAbierta = id;
   lector.style.setProperty("--linea", m.linea.color);
   lector.style.setProperty("--linea-tinta", m.linea.tinta);
 
   const barra = lector.querySelector(".barra .medio");
   barra.replaceChildren(insignia(m), document.createTextNode(` ${m.nombre} `), el("span", null, `· ${[hora(n.publicada || n.fecha), `${n.minutos} min`].filter(Boolean).join(" · ")}`));
-  barra.querySelector(".insignia").style.marginRight = "4px";
-  barra.querySelector(".insignia").style.verticalAlign = "-7px";
-  lector.querySelector(".enlace-original").href = n.url;
 
   const art = lector.querySelector("article");
   art.replaceChildren();
@@ -606,13 +813,14 @@ function abrirNota(id, { sinAnimacion = false } = {}) {
     art.append(f);
   }
   if (n.a_medias) {
-    const aviso = el("p", "medias");
-    aviso.append(el("b", null, "Nota a medias. "), document.createTextNode(`${m.nombre} sólo deja leer el comienzo desde acá. La nota completa está en su sitio.`));
-    art.append(aviso);
+    const medias = el("p", "medias");
+    medias.append(el("b", null, "Nota a medias. "), document.createTextNode(`${m.nombre} sólo deja leer el comienzo desde acá. La nota completa está en su sitio.`));
+    art.append(medias);
   }
   const cuerpo = el("div", "cuerpo");
   cuerpo.append(...limpiarCuerpo(n.cuerpo_html, n.foto, n.url).childNodes);
   art.append(cuerpo);
+  for (const d of estado.biblioteca.get(id)?.destacados || []) marcarTexto(cuerpo, d.texto);
 
   const cierre = lector.querySelector(".cierre");
   cierre.replaceChildren();
@@ -621,20 +829,20 @@ function abrirNota(id, { sinAnimacion = false } = {}) {
   original.target = "_blank";
   original.rel = "noopener";
   original.append(document.createTextNode(n.a_medias ? `Seguir leyendo en ${m.nombre}` : `Ver la nota en ${m.nombre}`));
-  original.insertAdjacentHTML("beforeend", '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>');
+  original.insertAdjacentHTML("beforeend", ICONO.externo);
   cierre.append(original);
-  const cuaderno = estado.edicion.cuadernos.find((c) => c.medio === n.medio);
-  const sig = cuaderno && cuaderno.notas[cuaderno.notas.indexOf(id) + 1];
+  const sig = proximaDe(id);
   if (sig) {
     const b = el("button", "proxima");
     b.type = "button";
     const titulo = estado.notas.get(sig).titulo;
-    b.setAttribute("aria-label", `Próxima nota de ${m.nombre}: ${titulo}`);
+    b.setAttribute("aria-label", `Próxima nota de ${nombreSeccion(estado.notas.get(sig).categoria) || "la sección"}: ${titulo}`);
     b.append(el("span", null, titulo));
-    b.insertAdjacentHTML("beforeend", '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>');
+    b.insertAdjacentHTML("beforeend", ICONO.flecha);
     b.addEventListener("click", () => { lector.scrollTo({ top: 0 }); abrirNota(sig); });
     cierre.append(b);
   }
+  pintarBotonesLector();
 
   lector.hidden = false;
   lector.scrollTop = 0;
@@ -646,24 +854,388 @@ function abrirNota(id, { sinAnimacion = false } = {}) {
   } else {
     requestAnimationFrame(() => requestAnimationFrame(() => lector.classList.add("abierto")));
   }
-  libro.inert = true;
-  recorrido.inert = true;
+  for (const n2 of [libro, recorrido, indiceBoton, chipFiltro, panel]) n2.inert = true;
   lector.querySelector("button.cerrar").focus({ preventScroll: true });
 
   estado.leidas.add(id);
-  guardarMemoria("leidas", [...estado.leidas].slice(-600));
+  guardarMemoria("leidas", [...estado.leidas].slice(-800));
+  // Si estaba para más tarde, ya la estás leyendo: sale de esa lista.
+  const reg = estado.biblioteca.get(id);
+  if (reg?.masTarde) { reg.masTarde = null; reg.avisado = false; persistir(reg); }
   pintarAperturas();
   pintarRecorrido();
 }
 
 function cerrarNota() {
   lector.classList.remove("abierto");
-  libro.inert = false;
-  recorrido.inert = false;
+  estado.notaAbierta = null;
+  botonDestacar.hidden = true;
+  for (const n of [libro, recorrido, indiceBoton, chipFiltro]) n.inert = false;
+  panel.inert = false;
   const fin = () => { if (!lector.classList.contains("abierto")) lector.hidden = true; };
   if (reducido.matches) fin(); else setTimeout(fin, 440);
+  if (!panel.hidden) dibujarPanel();
 }
 lector.querySelector("button.cerrar").addEventListener("click", cerrarNota);
+
+function pintarBotonesLector() {
+  const reg = estado.biblioteca.get(estado.notaAbierta);
+  const g = lector.querySelector(".guardar");
+  const guardada = Boolean(reg?.guardada);
+  g.setAttribute("aria-pressed", String(guardada));
+  g.setAttribute("aria-label", guardada ? "Quitar de guardadas" : "Guardar la nota");
+  g.classList.toggle("activo", guardada);
+  lector.querySelector(".tarde").classList.toggle("activo", Boolean(reg?.masTarde));
+}
+
+lector.querySelector(".guardar").addEventListener("click", async () => {
+  const reg = registroDe(estado.notaAbierta);
+  reg.guardada = reg.guardada ? null : new Date().toISOString();
+  await persistir(reg);
+  pintarBotonesLector();
+  avisar(reg.guardada ? "Guardada" : "Quitada de guardadas");
+});
+lector.querySelector(".compartir").addEventListener("click", () => compartir([estado.notaAbierta], "compartir"));
+lector.querySelector(".tarde").addEventListener("click", () => abrirHojita(estado.notaAbierta));
+
+/* ---------- destacar: marcar un pedazo del texto ---------- */
+// Envuelve en <mark> la primera aparición de `texto` dentro de `raiz`, aunque cruce negritas o enlaces.
+function marcarTexto(raiz, texto) {
+  const buscado = texto.replace(/\s+/g, " ").trim();
+  if (!buscado) return false;
+  const nodos = [];
+  let total = "";
+  const w = document.createTreeWalker(raiz, NodeFilter.SHOW_TEXT);
+  while (w.nextNode()) { nodos.push({ n: w.currentNode, desde: total.length }); total += w.currentNode.data; }
+  let normal = "";
+  const mapa = [];
+  let enBlanco = false;
+  for (let i = 0; i < total.length; i++) {
+    if (/\s/.test(total[i])) {
+      if (!enBlanco) { normal += " "; mapa.push(i); }
+      enBlanco = true;
+    } else { normal += total[i]; mapa.push(i); enBlanco = false; }
+  }
+  const k = normal.indexOf(buscado);
+  if (k < 0) return false;
+  const inicio = mapa[k], fin = mapa[k + buscado.length - 1] + 1;
+  for (const { n, desde } of nodos) {
+    const hasta = desde + n.data.length;
+    if (hasta <= inicio || desde >= fin) continue;
+    const a = Math.max(inicio, desde) - desde, b = Math.min(fin, hasta) - desde;
+    let tramo = n;
+    if (a > 0) tramo = n.splitText(a);
+    if (b - a < tramo.data.length) tramo.splitText(b - a);
+    const mark = el("mark");
+    mark.dataset.texto = buscado;
+    tramo.replaceWith(mark);
+    mark.append(tramo);
+  }
+  return true;
+}
+function desmarcar(raiz, texto) {
+  for (const m of [...raiz.querySelectorAll("mark")].filter((x) => x.dataset.texto === texto)) m.replaceWith(...m.childNodes);
+  raiz.normalize();
+}
+
+let destacarModo = null;  // { tipo: "nuevo", texto } | { tipo: "quitar", texto }
+function pintarDestacar(modo) {
+  destacarModo = modo;
+  botonDestacar.hidden = !modo;
+  if (modo) botonDestacar.querySelector("span").textContent = modo.tipo === "nuevo" ? "Destacar" : "Quitar destacado";
+}
+document.addEventListener("selectionchange", () => {
+  if (!lector.classList.contains("abierto")) return;
+  const sel = getSelection();
+  const cuerpo = lector.querySelector(".cuerpo");
+  const texto = sel && !sel.isCollapsed ? sel.toString().replace(/\s+/g, " ").trim() : "";
+  const adentro = cuerpo && sel.rangeCount && cuerpo.contains(sel.getRangeAt(0).commonAncestorContainer);
+  if (texto.length >= 3 && adentro) pintarDestacar({ tipo: "nuevo", texto });
+  else if (destacarModo?.tipo === "nuevo") pintarDestacar(null);
+});
+lector.addEventListener("click", (ev) => {
+  const mark = ev.target.closest("mark");
+  if (mark && getSelection().isCollapsed) pintarDestacar({ tipo: "quitar", texto: mark.dataset.texto });
+  else if (destacarModo?.tipo === "quitar" && !ev.target.closest("#destacar")) pintarDestacar(null);
+});
+botonDestacar.addEventListener("pointerdown", (ev) => ev.preventDefault());  // que no se pierda la selección
+botonDestacar.addEventListener("click", async () => {
+  if (!destacarModo) return;
+  const cuerpo = lector.querySelector(".cuerpo");
+  const reg = registroDe(estado.notaAbierta);
+  if (destacarModo.tipo === "nuevo") {
+    if (!reg.destacados.some((d) => d.texto === destacarModo.texto) && marcarTexto(cuerpo, destacarModo.texto)) {
+      reg.destacados.push({ texto: destacarModo.texto, creado: new Date().toISOString() });
+      if (!reg.guardada) reg.guardada = new Date().toISOString();
+      avisar("Destacado. La nota quedó en guardadas");
+    }
+    getSelection().removeAllRanges();
+  } else {
+    reg.destacados = reg.destacados.filter((d) => d.texto !== destacarModo.texto);
+    desmarcar(cuerpo, destacarModo.texto);
+    avisar("Destacado quitado");
+  }
+  await persistir(reg);
+  pintarBotonesLector();
+  pintarDestacar(null);
+});
+
+/* ---------- leer más tarde: sin aviso al teléfono, el recordatorio aparece al abrir el diario ---------- */
+let notaParaTarde = null;
+function opcionesDeTarde() {
+  const ahora = new Date();
+  const a = (dias, h) => { const d = new Date(ahora); d.setDate(d.getDate() + dias); d.setHours(h, 0, 0, 0); return d; };
+  const opciones = [["En una hora", new Date(ahora.getTime() + 3600e3)]];
+  if (ahora.getHours() < 20) opciones.push(["Esta noche, 21 h", a(0, 21)]);
+  else opciones.push(["Mañana al mediodía, 13 h", a(1, 13)]);
+  opciones.push(["Mañana a la mañana, 8 h", a(1, 8)]);
+  return opciones;
+}
+function abrirHojita(id) {
+  notaParaTarde = id;
+  const caja = hojitaTarde.querySelector(".opciones");
+  caja.replaceChildren();
+  const reg = estado.biblioteca.get(id);
+  for (const [texto, cuando] of opcionesDeTarde()) {
+    const b = el("button", null, texto);
+    b.type = "button";
+    b.addEventListener("click", async () => {
+      const r = registroDe(id);
+      r.masTarde = cuando.toISOString();
+      r.avisado = false;
+      await persistir(r);
+      cerrarHojita();
+      pintarBotonesLector();
+      avisar(`Te la recuerdo después de las ${horaFmt.format(cuando)}`);
+    });
+    caja.append(b);
+  }
+  if (reg?.masTarde) {
+    const q = el("button", "quitar", "Ya no, sacarla de la lista");
+    q.type = "button";
+    q.addEventListener("click", async () => { reg.masTarde = null; await persistir(reg); cerrarHojita(); pintarBotonesLector(); avisar("Sacada de para más tarde"); });
+    caja.append(q);
+  }
+  hojitaTarde.hidden = false;
+  requestAnimationFrame(() => hojitaTarde.classList.add("abierta"));
+  caja.querySelector("button").focus();
+}
+function cerrarHojita() {
+  hojitaTarde.classList.remove("abierta");
+  setTimeout(() => { hojitaTarde.hidden = true; }, 260);
+}
+hojitaTarde.querySelector(".cancelar").addEventListener("click", cerrarHojita);
+hojitaTarde.addEventListener("click", (ev) => { if (ev.target === hojitaTarde) cerrarHojita(); });
+
+const botonRecordatorio = document.getElementById("recordatorio");
+function revisarRecordatorios() {
+  const ahora = Date.now();
+  const vencidas = [...estado.biblioteca.values()].filter((r) => r.masTarde && new Date(r.masTarde).getTime() <= ahora && !r.avisado);
+  if (!vencidas.length || document.hidden) return;
+  botonRecordatorio.replaceChildren(
+    el("span", "titulo", vencidas.length === 1 ? `Para leer ahora: ${vencidas[0].nota.titulo}` : `Tenés ${vencidas.length} notas para leer ahora`),
+    el("span", null, "· Abrir"));
+  botonRecordatorio.dataset.ids = vencidas.map((r) => r.id).join(",");
+  botonRecordatorio.hidden = false;
+  requestAnimationFrame(() => botonRecordatorio.classList.add("visible"));
+  for (const r of vencidas) { r.avisado = true; persistir(r); }
+}
+botonRecordatorio.addEventListener("click", () => {
+  const ids = botonRecordatorio.dataset.ids.split(",");
+  botonRecordatorio.classList.remove("visible");
+  setTimeout(() => { botonRecordatorio.hidden = true; }, 450);
+  if (ids.length === 1) abrirNota(ids[0]);
+  else abrirPanel("tarde");
+});
+
+/* ---------- compartir: una o varias notas, por mail o para Claude ---------- */
+function bloqueDeNota(reg, completo) {
+  const n = reg.nota;
+  const fecha = diaFmt.format(new Date(n.publicada || n.fecha || reg.guardada || Date.now()));
+  const destacados = reg.destacados.map((d) => `«${d.texto}»`);
+  if (!completo) {
+    return [n.titulo, `${reg.medio.nombre} · ${fecha}`, ...destacados, n.url].join("\n");
+  }
+  return [`# ${n.titulo}`, `${reg.medio.nombre} · ${fecha} · ${n.url}`, n.bajada || "", textoPlano(n.cuerpo_html),
+    destacados.length ? `Lo que destaqué:\n${destacados.map((d) => `- ${d}`).join("\n")}` : ""].filter(Boolean).join("\n\n");
+}
+async function compartir(ids, como) {
+  const regs = ids.map((id) => estado.biblioteca.get(id) || registroDe(id));
+  const completo = como === "claude";
+  const texto = regs.map((r) => bloqueDeNota(r, completo)).join(completo ? "\n\n---\n\n" : "\n\n———\n\n");
+  const asunto = regs.length === 1 ? regs[0].nota.titulo : `${regs.length} notas de el diario del pelado`;
+  if (como === "mail") {
+    location.href = `mailto:?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(texto)}`;
+    return;
+  }
+  const datos = regs.length === 1 && !completo
+    ? { title: asunto, text: bloqueDeNota(regs[0], false).replace(`\n${regs[0].nota.url}`, ""), url: regs[0].nota.url }
+    : { title: asunto, text: texto };
+  try {
+    if (navigator.share) { await navigator.share(datos); return; }
+    throw new Error("sin share");
+  } catch (err) {
+    if (err?.name === "AbortError") return;  // cerraste el menú de compartir
+    try {
+      await navigator.clipboard.writeText(datos.url ? `${datos.text}\n${datos.url}` : datos.text);
+      avisar(completo ? "Copiado: pegalo en Claude" : "Copiado para compartir");
+    } catch { avisar("No se pudo compartir desde acá"); }
+  }
+}
+
+/* ---------- tus notas: guardadas y para más tarde ---------- */
+let pestana = "guardadas";
+let eligiendo = false;
+const elegidas = new Set();
+
+function abrirPanel(cual = "guardadas") {
+  cerrarIndice();
+  pestana = cual;
+  eligiendo = false;
+  elegidas.clear();
+  dibujarPanel();
+  panel.hidden = false;
+  requestAnimationFrame(() => panel.classList.add("abierto"));
+  for (const n of [libro, recorrido, indiceBoton, chipFiltro]) n.inert = true;
+}
+function cerrarPanel() {
+  panel.classList.remove("abierto");
+  for (const n of [libro, recorrido, indiceBoton, chipFiltro]) n.inert = false;
+  setTimeout(() => { panel.hidden = true; }, 360);
+}
+panel.querySelector(".cerrar").addEventListener("click", cerrarPanel);
+for (const b of panel.querySelectorAll("[data-pestana]")) {
+  b.addEventListener("click", () => { pestana = b.dataset.pestana; eligiendo = false; elegidas.clear(); dibujarPanel(); });
+}
+panel.querySelector(".elegir").addEventListener("click", () => { eligiendo = !eligiendo; elegidas.clear(); dibujarPanel(); });
+for (const b of panel.querySelectorAll(".seleccion [data-accion]")) {
+  b.addEventListener("click", () => { if (elegidas.size) compartir([...elegidas], b.dataset.accion); });
+}
+
+function dibujarPanel() {
+  for (const b of panel.querySelectorAll("[data-pestana]")) b.setAttribute("aria-selected", String(b.dataset.pestana === pestana));
+  const elegir = panel.querySelector(".elegir");
+  elegir.textContent = eligiendo ? "Listo" : "Elegir";
+  elegir.hidden = pestana !== "guardadas";
+  const regs = [...estado.biblioteca.values()].filter((r) => (pestana === "guardadas" ? r.guardada : r.masTarde));
+  // Guardadas: en orden cronológico de la nota, de la más nueva a la más vieja. Para más tarde: por hora del recordatorio.
+  if (pestana === "guardadas") regs.sort((a, b) => (b.nota.publicada || b.nota.fecha || b.guardada).localeCompare(a.nota.publicada || a.nota.fecha || a.guardada));
+  else regs.sort((a, b) => a.masTarde.localeCompare(b.masTarde));
+  const lista = panel.querySelector(".lista");
+  lista.replaceChildren();
+  if (!regs.length) {
+    const vacio = el("div", "vacio");
+    vacio.append(el("h3", null, pestana === "guardadas" ? "Todavía no guardaste notas." : "No tenés notas para más tarde."),
+      el("p", null, pestana === "guardadas"
+        ? "En el lector, tocá el señalador para guardar una nota, o marcá un pedazo del texto para destacarlo."
+        : "En el lector, tocá el reloj y elegí cuándo querés que te la recuerde."));
+    lista.append(vacio);
+  }
+  let diaActual = "";
+  for (const r of regs) {
+    const cuando = pestana === "guardadas" ? (r.nota.publicada || r.nota.fecha || r.guardada) : r.masTarde;
+    const dia = diaFmt.format(new Date(cuando));
+    if (pestana === "guardadas" && dia !== diaActual) { lista.append(el("h3", "dia", dia)); diaActual = dia; }
+    const item = el("article", "guardada");
+    item.style.cssText = colores(r.medio);
+    if (eligiendo) {
+      const tilde = el("input");
+      tilde.type = "checkbox";
+      tilde.checked = elegidas.has(r.id);
+      tilde.setAttribute("aria-label", `Elegir: ${r.nota.titulo}`);
+      tilde.addEventListener("change", () => { tilde.checked ? elegidas.add(r.id) : elegidas.delete(r.id); pintarSeleccion(); });
+      item.append(tilde);
+      item.classList.add("eligiendo");
+    }
+    const pie = el("p", "pie");
+    pie.append(insignia(r.medio), document.createTextNode(r.medio.nombre),
+      el("span", "gris", pestana === "guardadas" ? `· ${hora(r.nota.publicada || r.nota.fecha)}` : `· para después de las ${hora(r.masTarde)}`));
+    const titulo = el("button", "titulo", r.nota.titulo);
+    titulo.type = "button";
+    titulo.addEventListener("click", () => (eligiendo ? item.querySelector("input").click() : abrirNota(r.id)));
+    item.append(pie, titulo);
+    if (r.destacados.length) {
+      const ul = el("ul", "destacados");
+      for (const d of r.destacados) { const li = el("li"); li.append(el("mark", null, d.texto)); ul.append(li); }
+      item.append(ul);
+    }
+    if (!eligiendo) {
+      const acciones = el("div", "acciones");
+      const c = el("button", null, "Compartir");
+      c.type = "button";
+      c.addEventListener("click", () => compartir([r.id], "compartir"));
+      const q = el("button", null, "Quitar");
+      q.type = "button";
+      q.addEventListener("click", async () => {
+        if (pestana === "guardadas") { r.guardada = null; r.destacados = []; } else r.masTarde = null;
+        await persistir(r);
+        dibujarPanel();
+        avisar("Quitada");
+      });
+      acciones.append(c, q);
+      item.append(acciones);
+    }
+    lista.append(item);
+  }
+  pintarSeleccion();
+}
+function pintarSeleccion() {
+  const pie = panel.querySelector(".seleccion");
+  pie.hidden = !eligiendo;
+  pie.querySelector(".cuantas").textContent = elegidas.size ? `${elegidas.size} ${elegidas.size === 1 ? "elegida" : "elegidas"}` : "Elegí notas";
+  for (const b of pie.querySelectorAll("button")) b.disabled = !elegidas.size;
+}
+
+/* ---------- índice: la red completa, siempre a mano ---------- */
+function abrirIndice() {
+  const e = estado.edicion;
+  indice.querySelector(".titulo").textContent = `Edición de las ${horaFmt.format(new Date(e.generada))}`;
+  const red = indice.querySelector(".red");
+  red.replaceChildren();
+  const seccionActual = estado.hojas[estado.actual]?.seccion;
+  const item = (texto, cuenta, alTocar, actual) => {
+    const li = el("li");
+    const b = el("button");
+    b.type = "button";
+    b.append(el("span", "nombre", texto));
+    if (cuenta != null) b.append(el("span", "cuenta", String(cuenta)));
+    if (actual) { li.classList.add("aca"); b.setAttribute("aria-current", "true"); }
+    b.addEventListener("click", () => { cerrarIndice(); alTocar(); });
+    li.append(b);
+    red.append(li);
+  };
+  item("Tapa", null, () => mostrar(0), estado.actual === 0);
+  for (const s of estado.secciones) {
+    item(s.nombre, s.notas.length, () => mostrar(estado.hojas.findIndex((h) => h.seccion === s.id && h.el.classList.contains("apertura"))),
+      estado.actual !== 0 && seccionActual === s.id);
+  }
+  const otros = indice.querySelector(".otros");
+  otros.replaceChildren();
+  const boton = (texto, cuenta, alTocar) => {
+    const b = el("button");
+    b.type = "button";
+    b.append(el("span", null, texto));
+    if (cuenta != null) b.append(el("span", "cuenta", String(cuenta)));
+    b.addEventListener("click", alTocar);
+    otros.append(b);
+  };
+  const regs = [...estado.biblioteca.values()];
+  boton("Guardadas", regs.filter((r) => r.guardada).length, () => abrirPanel("guardadas"));
+  boton("Para más tarde", regs.filter((r) => r.masTarde).length, () => abrirPanel("tarde"));
+  boton(estado.filtro ? `Medios: sólo ${estado.medios.get(estado.filtro).nombre}` : "Medios", null, () => { cerrarIndice(); abrirMedios(null); });
+  indice.hidden = false;
+  indiceBoton.setAttribute("aria-expanded", "true");
+  requestAnimationFrame(() => indice.classList.add("abierto"));
+  indice.querySelector(".red button").focus();
+}
+function cerrarIndice() {
+  if (indice.hidden) return;
+  indice.classList.remove("abierto");
+  indiceBoton.setAttribute("aria-expanded", "false");
+  setTimeout(() => { indice.hidden = true; }, 300);
+}
+indiceBoton.addEventListener("click", () => (indice.hidden ? abrirIndice() : cerrarIndice()));
+indice.querySelector(".cerrar").addEventListener("click", cerrarIndice);
 
 /* ---------- tamaño: teléfono o tableta, y la orientación ---------- */
 function medir() {
@@ -697,17 +1269,9 @@ addEventListener("resize", () => { clearTimeout(esperaTamano); esperaTamano = se
 // La clave derivada se guarda en este equipo como CryptoKey no exportable: la frase no se guarda.
 const base64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 
-function baseDeClaves() {
-  return new Promise((ok, mal) => {
-    const r = indexedDB.open("diario-del-pelado", 1);
-    r.onupgradeneeded = () => r.result.createObjectStore("claves");
-    r.onsuccess = () => ok(r.result);
-    r.onerror = () => mal(r.error);
-  });
-}
 async function claveGuardada() {
   try {
-    const db = await baseDeClaves();
+    const db = await abrirBase();
     return await new Promise((ok) => {
       const r = db.transaction("claves").objectStore("claves").get("edicion");
       r.onsuccess = () => ok(r.result || null);
@@ -717,7 +1281,7 @@ async function claveGuardada() {
 }
 async function guardarClave(clave) {
   try {
-    const db = await baseDeClaves();
+    const db = await abrirBase();
     db.transaction("claves", "readwrite").objectStore("claves").put(clave, "edicion");
   } catch { /* sin almacenamiento: la pedirá de nuevo la próxima vez */ }
 }
@@ -790,6 +1354,7 @@ function montar(edicion) {
   estado.edicion = edicion;
   estado.medios = new Map(edicion.medios.map((m) => [m.id, m]));
   estado.notas = new Map(edicion.notas.map((n) => [n.id, n]));
+  if (estado.filtro && !estado.medios.has(estado.filtro)) estado.filtro = null;
   const cs = edicion.medios.map((m) => m.linea.color);
   const paso = 100 / cs.length;
   document.documentElement.style.setProperty("--combinacion",
@@ -827,22 +1392,28 @@ botonNueva.addEventListener("click", async () => {
 
 /* ---------- arranque ---------- */
 async function iniciar() {
+  await cargarBiblioteca();
   montar(await cargarEdicion());
   estado.leidas = new Set(leerMemoria("leidas", []));
-  rearmar(false);
-  // Volver a la estación donde te bajaste, si es la misma edición.
+  // Volver a la estación donde te bajaste, si es la misma edición (y el mismo filtro).
   const pos = leerMemoria("posicion", null);
+  if (pos && pos.edicion === estado.edicion.generada && pos.filtro && estado.medios.has(pos.filtro)) estado.filtro = pos.filtro;
+  rearmar(false);
+  pintarFiltro();
   if (pos && pos.edicion === estado.edicion.generada && pos.modo === estado.modo) mostrar(pos.hoja);
-  // Enlaces directos: #hoja=N abre esa hoja; #nota=ID, esa nota en el lector.
+  // Enlaces directos: #hoja=N abre esa hoja; #seccion=id, su apertura; #nota=ID, esa nota en el lector.
   const ancla = new URLSearchParams(location.hash.slice(1));
   if (ancla.has("hoja")) mostrar(Number(ancla.get("hoja")));
   if (ancla.has("seccion")) mostrar(Math.max(0, estado.hojas.findIndex((h) => h.seccion === ancla.get("seccion"))));
-  if (ancla.has("nota") && estado.notas.has(ancla.get("nota"))) abrirNota(ancla.get("nota"), { sinAnimacion: true });
+  if (ancla.has("nota") && notaPorId(ancla.get("nota"))) abrirNota(ancla.get("nota"), { sinAnimacion: true });
+  indiceBoton.hidden = false;
   aviso.textContent = `Edición de las ${horaFmt.format(new Date(estado.edicion.generada))} lista.`;
 
-  // Con la app abierta, cada 5 minutos y al volver a ella se fija si hay edición nueva.
-  setInterval(revisarEdicion, 5 * 60 * 1000);
-  document.addEventListener("visibilitychange", revisarEdicion);
+  // Con la app abierta, cada 5 minutos y al volver a ella se fija si hay edición nueva
+  // y si llegó la hora de alguna nota que dejaste para más tarde.
+  revisarRecordatorios();
+  setInterval(() => { revisarEdicion(); revisarRecordatorios(); }, 60 * 1000);
+  document.addEventListener("visibilitychange", () => { revisarEdicion(); revisarRecordatorios(); });
 }
 
 // El service worker se registra de entrada (también con la pantalla de la clave abierta),

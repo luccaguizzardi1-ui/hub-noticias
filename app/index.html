@@ -24,18 +24,92 @@
     <p class="leyenda"><span class="donde"></span><span class="proxima-seccion"></span></p>
   </nav>
 
+  <button id="indice-boton" class="indice-boton" type="button" aria-label="Índice: secciones, tapa y guardadas" aria-controls="indice" aria-expanded="false" hidden>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16"/><circle cx="7" cy="6" r="2"/><circle cx="7" cy="12" r="2"/><circle cx="7" cy="18" r="2"/><path d="M12 6h8M12 12h8M12 18h8"/></svg>
+  </button>
+
+  <div id="filtro" class="filtro" hidden>
+    <button class="texto" type="button" aria-haspopup="dialog" aria-controls="medios"></button>
+    <button class="quitar" type="button" aria-label="Ver todos los medios">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+
   <div id="lector" class="lector" role="dialog" aria-modal="true" aria-label="Nota" hidden>
     <header class="barra">
       <p class="medio"></p>
-      <a class="cerrar enlace-original" target="_blank" rel="noopener" aria-label="Abrir la nota en el sitio del medio">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
-      </a>
-      <button class="cerrar" type="button" aria-label="Cerrar la nota">
+      <button class="icono guardar" type="button" aria-pressed="false" aria-label="Guardar la nota">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h12v17l-6-4.2-6 4.2z"/></svg>
+      </button>
+      <button class="icono tarde" type="button" aria-label="Leer más tarde">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>
+      </button>
+      <button class="icono compartir" type="button" aria-label="Compartir la nota">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M8 7l4-4 4 4M5 12v7a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 19v-7"/></svg>
+      </button>
+      <button class="icono cerrar" type="button" aria-label="Cerrar la nota">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
     </header>
     <article></article>
     <footer class="cierre"></footer>
+  </div>
+
+  <button id="destacar" class="destacar" type="button" hidden>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h7M14.5 4.5l5 5-9 9H5.5v-5z"/></svg>
+    <span>Destacar</span>
+  </button>
+
+  <nav id="indice" class="indice" aria-label="Índice de la edición" hidden>
+    <header>
+      <p class="titulo"></p>
+      <button class="icono cerrar" type="button" aria-label="Cerrar el índice">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </header>
+    <ol class="red"></ol>
+    <div class="otros"></div>
+  </nav>
+
+  <section id="guardadas" class="panel" role="dialog" aria-modal="true" aria-label="Tus notas" hidden>
+    <header class="barra">
+      <div class="pestanas" role="tablist">
+        <button role="tab" type="button" data-pestana="guardadas" aria-selected="true">Guardadas</button>
+        <button role="tab" type="button" data-pestana="tarde" aria-selected="false">Para más tarde</button>
+      </div>
+      <button class="elegir" type="button">Elegir</button>
+      <button class="icono cerrar" type="button" aria-label="Cerrar">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </header>
+    <div class="lista"></div>
+    <footer class="seleccion" hidden>
+      <p class="cuantas"></p>
+      <button type="button" data-accion="mail">Mail</button>
+      <button type="button" data-accion="compartir">Compartir</button>
+      <button type="button" data-accion="claude">Para Claude</button>
+    </footer>
+  </section>
+
+  <div id="medios" class="desplegable" role="dialog" aria-modal="true" aria-labelledby="medios-titulo" hidden>
+    <div class="caja">
+      <header>
+        <h2 id="medios-titulo">Medios</h2>
+        <button class="icono cerrar" type="button" aria-label="Cerrar la lista de medios">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </header>
+      <div class="lista"></div>
+    </div>
+  </div>
+
+  <div id="mas-tarde" class="hojita" role="dialog" aria-modal="true" aria-labelledby="mas-tarde-titulo" hidden>
+    <div class="caja">
+      <h2 id="mas-tarde-titulo">¿Cuándo te la recuerdo?</h2>
+      <div class="opciones"></div>
+      <p class="aclaracion">Te aparece arriba cuando abras el diario después de esa hora.</p>
+      <button class="cancelar" type="button">Cancelar</button>
+    </div>
   </div>
 
   <section id="clave" class="clave" aria-labelledby="clave-titulo" hidden>
@@ -51,6 +125,8 @@
   </section>
 
   <button id="nueva" class="nueva" type="button" hidden></button>
+  <button id="recordatorio" class="nueva recordatorio" type="button" hidden></button>
+  <p id="toast" class="toast" role="status" aria-live="polite"></p>
 
   <p id="aviso" class="oculto" aria-live="polite"></p>
   <script src="app.js" defer></script>

@@ -20,22 +20,24 @@ Un solo lector: Lucca, que lo usa para sí mismo todos los días, en iPhone y en
 
 ## Positioning
 
-Ningún texto pasa por una IA: no hay resúmenes, traducciones ni reescrituras. Cada nota es la del medio, con su título, bajada, autor, foto y cuerpo, y un enlace al original. Sin publicidad, sin funciones sociales, sin algoritmo que decida qué ver: la selección de medios es de Lucca.
+Ningún texto pasa por una IA: no hay resúmenes, traducciones ni reescrituras. La única tarea de la IA (Gemini) es elegir la sección de cada nota nueva mirando su título y su bajada; nunca ve ni toca el cuerpo. Cada nota es la del medio, con su título, bajada, autor, foto y cuerpo, y un enlace al original. Sin publicidad, sin funciones sociales, sin algoritmo que decida qué ver: la selección de medios es de Lucca.
 
 ## Operating Context
 
 - Se abre desde la pantalla de inicio como una app, en vertical y horizontal; el iPad y el iPhone pesan lo mismo.
 - La edición se arma sola en GitHub cada 15 a 20 minutos; la app guarda la última para leer sin conexión.
-- Medios (datos/medios.json): El País, BBC Mundo, El Mundo, CNN en Español, Infobae, El Doce, La Nación, Página/12, Perfil, Todo Noticias y Le Monde Diplomatique Cono Sur.
+- Medios (datos/medios.json), 22 en tres grupos. De acá: Clarín, El Doce, Filo News, Infobae, La Nación, La Política Online, Le Monde Diplomatique Cono Sur, Letra P, Página/12, Perfil y Todo Noticias. De afuera: BBC Mundo, CNN en Español, El Mundo, El Orden Mundial, El País, Infobae América, Le Grand Continent y The New York Times en Español. Economía y tecnología: Bloomberg Línea, Hipertextual y Xataka.
 - Inspiración de uso declarada: Flipboard (tapa, páginas que se pasan, secciones, lector limpio). No se copian sus funciones sociales ni su publicidad.
 
 ## Capabilities and Constraints
 
-- Notas completas de 9 medios. El País queda "a medias" por decisión: título, foto, el comienzo que manda su RSS y enlace para seguir leyendo en su web (bloquea a los servidores de GitHub). Le Monde Diplomatique trae sólo el comienzo de las notas de su edición mensual (muro de pago); algunas notas web salen enteras.
+- Notas completas de casi todos los medios. El País y el New York Times en Español quedan "a medias" (el NYT bloquea las notas): título, foto, el comienzo que manda su RSS y enlace para seguir leyendo en su web (bloquea a los servidores de GitHub). Le Monde Diplomatique trae sólo el comienzo de las notas de su edición mensual (muro de pago); algunas notas web salen enteras.
 - Cada nota trae: medio, título, bajada (casi siempre), autor (a veces), fecha, foto principal (casi siempre), cuerpo en HTML (párrafos, intertítulos, fotos con epígrafe, citas, listas) y enlace al original.
-- Las categorías vienen de cada medio; no hay clasificación propia.
+- La edición se lee por secciones, en este orden: Política argentina, Internacional, Economía, Sociedad y policiales, IA y tecnología, Deportes, Cultura y espectáculos y Otras. La tapa entra directo a Política argentina. Gemini elige la sección de lo nuevo; si falla, la deciden reglas a partir de la sección que declara el medio.
+- La lista de medios (por nombre, no por insignia) deja leer uno solo.
+- Guardadas, para más tarde (sin notificación: un aviso al abrir después de la hora elegida), destacados y compartir una o varias notas por mail o para Claude. Todo queda en cada equipo; no se sincroniza entre el iPhone y el iPad.
 - Las notas se publican cifradas: la app pide una clave una sola vez y descifra en el dispositivo. Las notas nunca quedan legibles en público.
-- Sin decidir todavía: notificación push para la edición de la mañana (opcional), cómo se agrupan las secciones (por medio, por tema o ambas).
+- Sin decidir todavía: notificación push para la edición de la mañana (opcional).
 
 ## Brand Commitments
 

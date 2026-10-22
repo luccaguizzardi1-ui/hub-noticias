@@ -31,6 +31,7 @@ jobs:
       - name: Armar y cifrar
         env:
           DIARIO_CLAVE: ${{ secrets.DIARIO_CLAVE }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}  # sólo para elegir secciones
         run: python motor/publicar.py --salida _site --anterior anterior.json
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

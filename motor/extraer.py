@@ -121,6 +121,16 @@ def _documento(cuerpo):
         return lhtml.fromstring(cuerpo)
 
 
+def _seccion_ld(articulos):
+    for a in articulos:
+        s = a.get("articleSection")
+        if isinstance(s, list):
+            s = next((x for x in s if isinstance(x, str) and x.strip()), "")
+        if isinstance(s, str) and s.strip():
+            return s.strip()
+    return ""
+
+
 def _ld_articulos(doc):
     """Objetos NewsArticle/Article del JSON-LD de la página."""
     salida = []
@@ -197,6 +207,7 @@ def _arc(texto):
         "foto": foto,
         "cuerpo_html": "".join(partes),
         "restringida": ((data.get("content_restrictions") or {}).get("content_code") or "").lower(),
+        "seccion": (((data.get("taxonomy") or {}).get("primary_section") or {}).get("name") or "").strip(),
     }
 
 
@@ -299,6 +310,8 @@ def extraer(url, item=None):
         "fecha": arc.get("fecha") or meta.get("date") or "",
         "foto": _meta(doc, "og:image", "twitter:image") or arc.get("foto") or meta.get("image") or "",
         "medio": meta.get("sitename") or _meta(doc, "og:site_name"),
+        # La sección que el propio medio le pone a la nota: sirve para clasificarla sin IA.
+        "seccion": arc.get("seccion") or _seccion_ld(ld) or _meta(doc, "article:section", "og:section", "section"),
         "extractor": extractor,
         "palabras": p,
         "palabras_por_extractor": largos,
@@ -310,6 +323,12 @@ def extraer(url, item=None):
     nota["titulo"] = sin_firma_del_sitio(nota["titulo"], nota["medio"])
     nota["cuerpo_html"] = sin_encabezado(cuerpo, nota["titulo"], nota["bajada"])
 
+    if p < 60 and p_ld >= 80:
+        # Los extractores no encontraron el cuerpo, pero el medio lo declara entero en su JSON-LD.
+        parrafos = [x.strip() for x in re.split(r"\n+", cuerpo_ld) if x.strip()]
+        nota["cuerpo_html"] = "".join(f"<p>{html.escape(x)}</p>" for x in parrafos)
+        nota["extractor"], nota["palabras"] = "ld", p_ld
+        p = p_ld
     if p < 60:
         nota["veredicto"], nota["motivo"] = "falló", "no se encontró el cuerpo"
     elif p_ld >= 80:

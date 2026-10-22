@@ -52,7 +52,15 @@ class Respuesta:
 
 
 def bajar(url, timeout=20):
-    """GET que nunca levanta excepción: devuelve estado, URL final y cuerpo."""
+    """GET que nunca levanta excepción: devuelve estado, URL final y cuerpo.
+    Si el sitio tarda en contestar, se le da una segunda oportunidad más larga."""
+    r = _bajar(url, timeout)
+    if r.estado is None and r.error and "timed out" in r.error.lower():
+        r = _bajar(url, timeout * 2)
+    return r
+
+
+def _bajar(url, timeout):
     req = urllib.request.Request(url, headers={
         "User-Agent": UA,
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -119,7 +127,13 @@ def _texto(el, *nombres):
 
 
 def _xml(data):
-    return ET.fromstring(re.sub(rb"^[^<]+", b"", data))
+    data = re.sub(rb"^[^<]+", b"", data)
+    # Algunos sitios (Le Grand Continent) pegan un <script> después del cierre del feed.
+    cierres = [data.rfind(b"</" + t + b">") + len(t) + 3
+               for t in (b"rss", b"feed", b"urlset", b"sitemapindex", b"rdf:RDF") if b"</" + t + b">" in data]
+    if cierres:
+        data = data[:max(cierres)]
+    return ET.fromstring(data)
 
 
 def _foto(it):

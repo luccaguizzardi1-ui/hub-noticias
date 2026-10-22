@@ -99,9 +99,11 @@ components:
     rounded: "{rounded.circulo}"
     typography: "{typography.insignia}"
     size: "26px"
-  insignia-grande-tableta:
-    rounded: "{rounded.circulo}"
-    size: "38px"
+  selector-medio:
+    textColor: "{colors.cartel-texto}"
+    rounded: "0px"
+    padding: "7px 8px 7px 12px"
+    height: "38px"
   insignia-pie:
     rounded: "{rounded.circulo}"
     size: "22px"
@@ -289,10 +291,13 @@ Esquinas rectas en todo: fotos, piezas, botones, campo de clave, aviso, apertura
 ## Components
 
 ### Insignia de línea
-El círculo del subte con la letra del medio. Fondo = color de la línea, letra = su tinta. Diámetros: 26px en el cartel del teléfono (27px la variante grande, 33px en tableta parada, 38px en tableta acostada), 22px en el pie de pieza, 64px invertida (fondo tinta, letra color) en la placa de la apertura. En el cartel son botones que llevan al cuaderno de cada medio; al tocarlas se achican a 0.9 en 160ms.
+El círculo del subte con la letra del medio. Fondo = color de la línea, letra = su tinta. Diámetros: 22px en el pie de pieza y en la barra del lector, siempre junto al nombre del medio; 64px invertida (fondo tinta, letra color) en la placa de la apertura cuando se lee un solo medio. Nunca aparece sola para identificar un medio: la letra no es su logo.
 
 ### Cartel de estación
-La cabecera de la tapa, en chapa: calcomanía del logo (116px de alto en el teléfono, 104px en tableta, girada -2°), «Edición de las HH:MM», día y «N notas de M medios» en letra apagada, y la fila de once insignias.
+La cabecera de la tapa, en chapa: calcomanía del logo (116px de alto en el teléfono, 104px en tableta, girada -2°), «Edición de las HH:MM», día y «N notas de M medios» en letra apagada, y debajo el selector de medio: un botón con borde blanco al 38 %, «Todos los medios» o «Sólo Medio» y una flechita que gira al abrir.
+
+### Lista de medios
+Un desplegable en chapa que cuelga del selector (400px como máximo, 8px por debajo), con sombra suave y una entrada de 260ms. Arriba «Todos los medios»; después los nombres en Archivo 600 17px, en orden alfabético y en tres grupos con rótulo apagado de 13px (De acá, De afuera, Economía y tecnología), cada uno con su cantidad de notas a la derecha y una tilde en el elegido. Se abre también desde el chip del filtro y desde el índice.
 
 ### Pieza (nota en una hoja)
 Foto arriba a sangre (crece con el espacio que deja la hoja), texto abajo: título, bajada en Alegreya, pie fijo con insignia · medio · hora · minutos y «· a medias» cuando corresponde. Toda la pieza es un botón que abre el lector; el foco se dibuja 4px hacia adentro. Variantes: *principal* (título más grande, bajada hasta 4 líneas), *normal*, *chica* (sin foto ni bajada, 19px). Si la foto falla, la pieza queda sin foto.

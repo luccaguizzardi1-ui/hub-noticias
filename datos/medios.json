@@ -10,7 +10,8 @@
    "letra": "E",
    "color": "#A0522D",
    "tinta": "#FFFFFF"
-  }
+  },
+  "grupo": "afuera"
  },
  {
   "id": "bbcmundo",
@@ -22,7 +23,8 @@
    "letra": "B",
    "color": "#00857C",
    "tinta": "#FFFFFF"
-  }
+  },
+  "grupo": "afuera"
  },
  {
   "id": "elmundo",
@@ -34,7 +36,8 @@
    "letra": "M",
    "color": "#E4007C",
    "tinta": "#FFFFFF"
-  }
+  },
+  "grupo": "afuera"
  },
  {
   "id": "cnnespanol",
@@ -45,7 +48,8 @@
    "letra": "C",
    "color": "#F15A22",
    "tinta": "#16181D"
-  }
+  },
+  "grupo": "afuera"
  },
  {
   "id": "infobae",
@@ -56,7 +60,8 @@
    "letra": "I",
    "color": "#F7A800",
    "tinta": "#16181D"
-  }
+  },
+  "grupo": "aca"
  },
  {
   "id": "eldoce",
@@ -68,7 +73,8 @@
    "letra": "D",
    "color": "#00A651",
    "tinta": "#16181D"
-  }
+  },
+  "grupo": "aca"
  },
  {
   "id": "lanacion",
@@ -79,7 +85,8 @@
    "letra": "N",
    "color": "#0072BC",
    "tinta": "#FFFFFF"
-  }
+  },
+  "grupo": "aca"
  },
  {
   "id": "pagina12",
@@ -90,7 +97,8 @@
    "letra": "12",
    "color": "#E2231A",
    "tinta": "#FFFFFF"
-  }
+  },
+  "grupo": "aca"
  },
  {
   "id": "perfil",
@@ -102,7 +110,8 @@
    "letra": "P",
    "color": "#7B3F98",
    "tinta": "#FFFFFF"
-  }
+  },
+  "grupo": "aca"
  },
  {
   "id": "tn",
@@ -114,7 +123,8 @@
    "letra": "T",
    "color": "#00A6E0",
    "tinta": "#16181D"
-  }
+  },
+  "grupo": "aca"
  },
  {
   "id": "eldiplo",
@@ -126,6 +136,135 @@
    "letra": "L",
    "color": "#8DC63F",
    "tinta": "#16181D"
-  }
+  },
+  "grupo": "aca"
+ },
+ {
+  "id": "infobaeamerica",
+  "nombre": "Infobae América",
+  "web": "https://www.infobae.com/america/",
+  "feed": "https://www.infobae.com/arc/outboundfeeds/rss/category/america/",
+  "linea": {
+   "letra": "A",
+   "color": "#B26B00",
+   "tinta": "#16181D"
+  },
+  "grupo": "afuera"
+ },
+ {
+  "id": "lpo",
+  "nombre": "La Política Online",
+  "web": "https://www.lapoliticaonline.com",
+  "linea": {
+   "letra": "LPO",
+   "color": "#8C1D40",
+   "tinta": "#FFFFFF"
+  },
+  "grupo": "aca"
+ },
+ {
+  "id": "letrap",
+  "nombre": "Letra P",
+  "web": "https://www.letrap.com.ar",
+  "linea": {
+   "letra": "LP",
+   "color": "#5C6F82",
+   "tinta": "#FFFFFF"
+  },
+  "grupo": "aca"
+ },
+ {
+  "id": "filonews",
+  "nombre": "Filo News",
+  "web": "https://www.filo.news",
+  "linea": {
+   "letra": "F",
+   "color": "#FFD100",
+   "tinta": "#16181D"
+  },
+  "grupo": "aca"
+ },
+ {
+  "id": "elordenmundial",
+  "nombre": "El Orden Mundial",
+  "web": "https://elordenmundial.com",
+  "feed": "https://elordenmundial.com/feed",
+  "linea": {
+   "letra": "O",
+   "color": "#2E3A87",
+   "tinta": "#FFFFFF"
+  },
+  "grupo": "afuera"
+ },
+ {
+  "id": "bloomberglinea",
+  "nombre": "Bloomberg Línea",
+  "web": "https://www.bloomberglinea.com",
+  "linea": {
+   "letra": "BL",
+   "color": "#5A3FD6",
+   "tinta": "#FFFFFF"
+  },
+  "grupo": "temas"
+ },
+ {
+  "id": "xataka",
+  "nombre": "Xataka",
+  "web": "https://www.xataka.com",
+  "linea": {
+   "letra": "X",
+   "color": "#F49AC1",
+   "tinta": "#16181D"
+  },
+  "grupo": "temas"
+ },
+ {
+  "id": "hipertextual",
+  "nombre": "Hipertextual",
+  "web": "https://hipertextual.com",
+  "feed": "https://hipertextual.com/feed",
+  "linea": {
+   "letra": "H",
+   "color": "#6B7A00",
+   "tinta": "#FFFFFF"
+  },
+  "grupo": "temas"
+ },
+ {
+  "id": "clarin",
+  "nombre": "Clarín",
+  "web": "https://www.clarin.com",
+  "feed": "https://www.clarin.com/rss/lo-ultimo/",
+  "linea": {
+   "letra": "CL",
+   "color": "#90CAF9",
+   "tinta": "#16181D"
+  },
+  "grupo": "aca"
+ },
+ {
+  "id": "legrandcontinent",
+  "nombre": "Le Grand Continent",
+  "web": "https://legrandcontinent.eu/es/",
+  "feed": "https://legrandcontinent.eu/es/feed/",
+  "linea": {
+   "letra": "G",
+   "color": "#B39DDB",
+   "tinta": "#16181D"
+  },
+  "grupo": "afuera"
+ },
+ {
+  "id": "nytes",
+  "nombre": "The New York Times en Español",
+  "web": "https://www.nytimes.com/es/",
+  "feed": "https://rss.nytimes.com/services/xml/rss/nyt/es.xml",
+  "a_medias": true,
+  "linea": {
+   "letra": "NY",
+   "color": "#D7B98E",
+   "tinta": "#16181D"
+  },
+  "grupo": "afuera"
  }
 ]
