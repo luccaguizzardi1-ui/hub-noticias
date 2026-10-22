@@ -170,7 +170,7 @@ html:not(.tableta) .hoja.tapa .pieza .foto { min-height: 200px; }
 .mitad .sombra { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; z-index: 3; }
 .hojeador { position: absolute; transform-style: preserve-3d; will-change: transform; z-index: 3; }
 .hojeador .dorso { transform: rotateX(180deg); }
-.horizontal .hojeador .dorso { transform: rotateY(180deg); }
+.pliegue.eje-x .hojeador .dorso { transform: rotateY(180deg); }
 
 /* ---------- Lector ---------- */
 .lector { position: fixed; inset: 0; z-index: 10; background: var(--papel-lector); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;

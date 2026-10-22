@@ -343,7 +343,8 @@ function crearPliegue(sentido) {
   const quieta = horizontal ? (sentido > 0 ? "inset(0 50% 0 0)" : "inset(0 0 0 50%)") : (sentido > 0 ? "inset(0 0 50% 0)" : "inset(50% 0 0 0)");
   actual.style.clipPath = quieta;
 
-  const pliegue = el("div", `pliegue${horizontal ? " horizontal" : ""}`);
+  // Ojo: no usar la clase "horizontal" acá; es la del teléfono acostado y cambiaría el diseño de las copias.
+  const pliegue = el("div", `pliegue${horizontal ? " eje-x" : ""}`);
   const hojeador = el("div", "hojeador");
   const caja = horizontal
     ? { left: sentido > 0 ? W / 2 : 0, top: 0, width: W / 2, height: H, origen: sentido > 0 ? "0% 50%" : "100% 50%" }
