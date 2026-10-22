@@ -1,0 +1,48 @@
+# Arma la edición cada 20 minutos, la cifra y la publica en GitHub Pages con la app.
+name: Edición
+
+on:
+  schedule:
+    - cron: "7,27,47 * * * *"   # cada 20 minutos, lejos del minuto 0 que GitHub atrasa
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: edicion
+  cancel-in-progress: false
+
+jobs:
+  armar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Bajar la edición publicada (para reusar las notas que ya están)
+        run: curl -fsSL "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/edicion.cifrada.json" -o anterior.json || rm -f anterior.json
+      - name: Armar y cifrar
+        env:
+          DIARIO_CLAVE: ${{ secrets.DIARIO_CLAVE }}
+        run: python motor/publicar.py --salida _site --anterior anterior.json
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  publicar:
+    needs: armar
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.despliegue.outputs.page_url }}
+    steps:
+      - id: despliegue
+        uses: actions/deploy-pages@v4

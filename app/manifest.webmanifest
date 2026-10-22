@@ -1,0 +1,17 @@
+{
+  "name": "el diario del pelado",
+  "short_name": "el pelado",
+  "description": "Las notas completas de los medios que elegiste, en una edición que se arma sola.",
+  "lang": "es-AR",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#16181D",
+  "theme_color": "#16181D",
+  "icons": [
+    { "src": "marca/icono-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "marca/icono-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "marca/icono-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

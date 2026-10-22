@@ -9,3 +9,5 @@ informes/
 .env
 # La edición lleva el texto completo de las notas: nunca se sube sin cifrar.
 app/datos/
+.impeccable/review/
+_site/

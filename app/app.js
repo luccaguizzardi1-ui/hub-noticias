@@ -162,8 +162,13 @@ function hojaTapa(ids) {
   return h;
 }
 
-function hojaNotas(ids, plantilla, etiqueta) {
+function hojaNotas(ids, plantilla, etiqueta, medio) {
   const h = hojaBase(`${plantilla} con-recorrido`, etiqueta);
+  // El friso de la pared del andén: el color de la línea en la que estás (la combinación en la portada).
+  // Además ocupa la franja de la hora y la isla del iPhone, para que no tapen la foto ni el título.
+  const techo = el("div", `friso techo${medio ? "" : " combinacion"}`);
+  if (medio) techo.style.cssText = colores(medio);
+  h.append(techo);
   if (estado.modo === "tableta") {
     const g = el("div", `grilla ${plantilla}`);
     const conPrincipal = ["mosaico", "vertical", "una"].includes(plantilla);
@@ -203,10 +208,16 @@ function hojaApertura(cuaderno) {
   return h;
 }
 
+function textoFinal(hoja) {
+  const todas = estado.edicion.notas.every((n) => estado.leidas.has(n.id));
+  hoja.querySelector("p").textContent = `${todas ? "Leíste toda la edición." : "Llegaste al final de la edición."} La próxima se arma sola en unos minutos.`;
+}
+
 function hojaTerminal() {
   const h = hojaBase("terminal", "Fin de la edición");
+  h.append(el("div", "riel-final"));
   h.append(el("h2", null, "Fin de la línea."));
-  h.append(el("p", null, "Leíste toda la edición. La próxima se arma sola en unos minutos."));
+  h.append(el("p"));
   const b = el("button", "volver", "Volver a la tapa");
   b.type = "button";
   b.addEventListener("click", () => irA(0));
@@ -243,7 +254,7 @@ function armarHojas() {
   sumar(hojaTapa(portada.slice(0, enTapa)), "portada", portada.slice(0, enTapa));
   const patronPortada = tableta ? [["mosaico", 3], ["trio", 3], ["cuatro", 4]] : [["dos", 2], ["una", 1], ["tres", 3]];
   for (const t of trozos(portada.slice(enTapa), patronPortada)) {
-    sumar(hojaNotas(t.ids, ajustar(t.plantilla, t.ids.length), "Portada"), "portada", t.ids);
+    sumar(hojaNotas(t.ids, ajustar(t.plantilla, t.ids.length), "Portada", null), "portada", t.ids);
   }
 
   const patronCuaderno = tableta ? [["mosaico", 3], ["cuatro", 4], ["trio", 3]] : [["una", 1], ["dos", 2], ["tres", 3]];
@@ -251,10 +262,28 @@ function armarHojas() {
     const m = estado.medios.get(c.medio);
     sumar(hojaApertura(c), c.medio, []);
     for (const t of trozos(c.notas, patronCuaderno)) {
-      sumar(hojaNotas(t.ids, ajustar(t.plantilla, t.ids.length), m.nombre), c.medio, t.ids);
+      sumar(hojaNotas(t.ids, ajustar(t.plantilla, t.ids.length), m.nombre, m), c.medio, t.ids);
     }
   }
   sumar(hojaTerminal(), "fin", []);
+}
+
+// Las estaciones de una apertura muestran el título completo. Si no entran todas,
+// las últimas se resumen en una estación "y N notas más" (nunca se corta un título).
+function ajustarEstaciones(hoja) {
+  const lista = hoja.querySelector(".estaciones");
+  if (!lista || hoja.hidden) return;
+  lista.querySelector(".mas")?.remove();
+  const items = [...lista.querySelectorAll("li")];
+  items.forEach((li) => { li.hidden = false; });
+  let ocultas = 0;
+  const mas = el("li", "mas");
+  while (lista.scrollHeight > lista.clientHeight + 1 && items.length - ocultas > 1) {
+    ocultas++;
+    items[items.length - ocultas].hidden = true;
+    mas.textContent = `y ${ocultas} ${ocultas === 1 ? "nota más" : "notas más"} en las próximas hojas`;
+    if (!mas.isConnected) lista.append(mas);
+  }
 }
 
 /* ---------- marcas de estación: leída, pendiente, a medias ---------- */
@@ -273,9 +302,6 @@ function pintarRecorrido() {
   const riel = el("div", "riel");
   if (h.seccion === "portada") {
     riel.classList.add("combinacion");
-    const cs = estado.edicion.medios.map((m) => m.linea.color);
-    const paso = 100 / cs.length;
-    via.style.setProperty("--combinacion", `linear-gradient(90deg, ${cs.map((c, i) => `${c} ${i * paso}% ${(i + 1) * paso}%`).join(", ")})`);
     recorrido.style.setProperty("--linea", "#16181D");
   } else if (h.seccion !== "fin") {
     recorrido.style.setProperty("--linea", estado.medios.get(h.seccion).linea.color);
@@ -315,6 +341,8 @@ function mostrar(i) {
     h.el.style.clipPath = "";
   });
   estado.actual = i;
+  ajustarEstaciones(estado.hojas[i].el);
+  if (estado.hojas[i].seccion === "fin") textoFinal(estado.hojas[i].el);
   pintarRecorrido();
   guardarMemoria("posicion", { edicion: estado.edicion.generada, hoja: i, modo: estado.modo });
 }
@@ -337,6 +365,8 @@ function crearPliegue(sentido) {
 
   destino.hidden = false;
   destino.inert = true;
+  ajustarEstaciones(destino);
+  if (estado.hojas[estado.actual + sentido].seccion === "fin") textoFinal(destino);
   destino.style.zIndex = "1";
   actual.style.zIndex = "2";
   // Media hoja actual que queda quieta.
@@ -598,7 +628,10 @@ function abrirNota(id, { sinAnimacion = false } = {}) {
   if (sig) {
     const b = el("button", "proxima");
     b.type = "button";
-    b.append(el("small", null, `Próxima estación en ${m.nombre}`), el("span", null, estado.notas.get(sig).titulo));
+    const titulo = estado.notas.get(sig).titulo;
+    b.setAttribute("aria-label", `Próxima nota de ${m.nombre}: ${titulo}`);
+    b.append(el("span", null, titulo));
+    b.insertAdjacentHTML("beforeend", '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>');
     b.addEventListener("click", () => { lector.scrollTo({ top: 0 }); abrirNota(sig); });
     cierre.append(b);
   }
@@ -658,13 +691,142 @@ function rearmar(conservar) {
 let esperaTamano = 0;
 addEventListener("resize", () => { clearTimeout(esperaTamano); esperaTamano = setTimeout(() => rearmar(true), 180); });
 
+/* ---------- la edición cifrada ---------- */
+// En la nube la edición viaja cifrada (AES-GCM, clave derivada con PBKDF2 de la frase de Lucca).
+// La clave derivada se guarda en este equipo como CryptoKey no exportable: la frase no se guarda.
+const base64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+
+function baseDeClaves() {
+  return new Promise((ok, mal) => {
+    const r = indexedDB.open("diario-del-pelado", 1);
+    r.onupgradeneeded = () => r.result.createObjectStore("claves");
+    r.onsuccess = () => ok(r.result);
+    r.onerror = () => mal(r.error);
+  });
+}
+async function claveGuardada() {
+  try {
+    const db = await baseDeClaves();
+    return await new Promise((ok) => {
+      const r = db.transaction("claves").objectStore("claves").get("edicion");
+      r.onsuccess = () => ok(r.result || null);
+      r.onerror = () => ok(null);
+    });
+  } catch { return null; }
+}
+async function guardarClave(clave) {
+  try {
+    const db = await baseDeClaves();
+    db.transaction("claves", "readwrite").objectStore("claves").put(clave, "edicion");
+  } catch { /* sin almacenamiento: la pedirá de nuevo la próxima vez */ }
+}
+async function derivar(frase, sobre) {
+  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(frase.normalize("NFC")), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey({ name: "PBKDF2", hash: "SHA-256", salt: base64(sobre.sal), iterations: sobre.iteraciones },
+    base, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+}
+async function abrirSobre(sobre, clave) {
+  const plano = await crypto.subtle.decrypt({ name: "AES-GCM", iv: base64(sobre.iv) }, clave, base64(sobre.datos));
+  const flujo = new Blob([plano]).stream().pipeThrough(new DecompressionStream("gzip"));
+  return JSON.parse(await new Response(flujo).text());
+}
+
+function pedirClave(sobre) {
+  const pantalla = document.getElementById("clave");
+  const form = pantalla.querySelector("form");
+  const campo = pantalla.querySelector("input");
+  const boton = pantalla.querySelector("button");
+  const error = pantalla.querySelector(".error");
+  pantalla.hidden = false;
+  recorrido.hidden = true;
+  campo.focus();
+  return new Promise((ok) => {
+    form.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      boton.disabled = true;
+      boton.textContent = "Abriendo…";
+      error.textContent = "";
+      try {
+        const clave = await derivar(campo.value, sobre);
+        const edicion = await abrirSobre(sobre, clave);
+        await guardarClave(clave);
+        pantalla.hidden = true;
+        recorrido.hidden = false;
+        campo.value = "";
+        ok({ clave, edicion });
+      } catch {
+        error.textContent = "Esa clave no abre la edición. Revisala y probá de nuevo.";
+        campo.select();
+      } finally {
+        boton.disabled = false;
+        boton.textContent = "Abrir la edición";
+      }
+    });
+  });
+}
+
+async function traerSobre() {
+  const r = await fetch("edicion.cifrada.json", { cache: "no-cache" });
+  return r.ok ? r.json() : null;
+}
+
+// Lo que arma la edición: cifrada en la nube; sin cifrar sólo en la Mac, para trabajar.
+async function cargarEdicion() {
+  const sobre = await traerSobre().catch(() => null);
+  if (sobre) {
+    let clave = await claveGuardada();
+    let edicion = clave && await abrirSobre(sobre, clave).catch(() => null);
+    if (!edicion) ({ clave, edicion } = await pedirClave(sobre));
+    estado.clave = clave;
+    return edicion;
+  }
+  const r = await fetch("datos/edicion.json", { cache: "no-cache" });
+  if (!r.ok) throw new Error("No pude leer la edición");
+  return r.json();
+}
+
+function montar(edicion) {
+  estado.edicion = edicion;
+  estado.medios = new Map(edicion.medios.map((m) => [m.id, m]));
+  estado.notas = new Map(edicion.notas.map((n) => [n.id, n]));
+  const cs = edicion.medios.map((m) => m.linea.color);
+  const paso = 100 / cs.length;
+  document.documentElement.style.setProperty("--combinacion",
+    `linear-gradient(90deg, ${cs.map((c, i) => `${c} ${(i * paso).toFixed(2)}% ${((i + 1) * paso).toFixed(2)}%`).join(", ")})`);
+}
+
+/* ---------- edición nueva: se avisa, nunca te saca de la hoja ---------- */
+const botonNueva = document.getElementById("nueva");
+let nuevaPendiente = null;
+
+async function revisarEdicion() {
+  if (!estado.clave || document.hidden) return;
+  try {
+    const v = await (await fetch("version.json", { cache: "no-store" })).json();
+    if (v.generada && v.generada !== estado.edicion.generada && v.generada !== nuevaPendiente) {
+      nuevaPendiente = v.generada;
+      botonNueva.replaceChildren(document.createTextNode(`Edición de las ${horaFmt.format(new Date(v.generada))}`), el("span", null, "· Actualizar"));
+      botonNueva.hidden = false;
+      requestAnimationFrame(() => botonNueva.classList.add("visible"));
+    }
+  } catch { /* sin conexión: se vuelve a intentar más tarde */ }
+}
+
+botonNueva.addEventListener("click", async () => {
+  botonNueva.classList.remove("visible");
+  try {
+    const edicion = await abrirSobre(await traerSobre(), estado.clave);
+    montar(edicion);
+    estado.modo = "";          // fuerza a rearmar las hojas con la edición nueva
+    rearmar(true);
+    aviso.textContent = `Edición de las ${horaFmt.format(new Date(edicion.generada))} lista.`;
+  } catch { /* si falla, queda la que había */ }
+  setTimeout(() => { botonNueva.hidden = true; }, 450);
+});
+
 /* ---------- arranque ---------- */
 async function iniciar() {
-  const r = await fetch("datos/edicion.json", { cache: "no-cache" });
-  if (!r.ok) throw new Error(`No pude leer la edición (${r.status})`);
-  estado.edicion = await r.json();
-  for (const m of estado.edicion.medios) estado.medios.set(m.id, m);
-  for (const n of estado.edicion.notas) estado.notas.set(n.id, n);
+  montar(await cargarEdicion());
   estado.leidas = new Set(leerMemoria("leidas", []));
   rearmar(false);
   // Volver a la estación donde te bajaste, si es la misma edición.
@@ -676,6 +838,13 @@ async function iniciar() {
   if (ancla.has("seccion")) mostrar(Math.max(0, estado.hojas.findIndex((h) => h.seccion === ancla.get("seccion"))));
   if (ancla.has("nota") && estado.notas.has(ancla.get("nota"))) abrirNota(ancla.get("nota"), { sinAnimacion: true });
   aviso.textContent = `Edición de las ${horaFmt.format(new Date(estado.edicion.generada))} lista.`;
+
+  // Con la app abierta, cada 5 minutos y al volver a ella se fija si hay edición nueva.
+  setInterval(revisarEdicion, 5 * 60 * 1000);
+  document.addEventListener("visibilitychange", revisarEdicion);
+  if ("serviceWorker" in navigator && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  }
 }
 
 iniciar().catch((err) => {

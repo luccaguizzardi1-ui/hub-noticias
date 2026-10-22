@@ -110,7 +110,7 @@ img { display: block; max-width: 100%; }
 .apertura .placa { display: flex; align-items: center; gap: 14px; }
 .apertura .placa .insignia { --tam: 64px; background: var(--t); color: var(--c); font-size: 30px; }
 .apertura h2 { font-size: clamp(34px, 9vw, 64px); font-weight: 780; font-stretch: 84%; line-height: 0.96; letter-spacing: -0.02em; text-wrap: balance; }
-.apertura .resumen { font-size: 15px; font-weight: 550; margin-top: 10px; font-variant-numeric: tabular-nums; opacity: 0.85; }
+.apertura .resumen { font-size: 15px; font-weight: 550; margin-top: 10px; font-variant-numeric: tabular-nums; }
 .apertura .estaciones { list-style: none; margin-top: 28px; position: relative; padding-left: 34px; flex: 1; min-height: 0; overflow: hidden; }
 .apertura .estaciones::before { content: ""; position: absolute; left: 10px; top: 10px; bottom: 10px; width: 5px; background: var(--t); border-radius: 3px; }
 .apertura .estaciones li { position: relative; }
@@ -123,7 +123,8 @@ img { display: block; max-width: 100%; }
 .terminal { background: var(--cartel); color: var(--cartel-texto); justify-content: center; align-items: flex-start; padding: 32px 28px; gap: 14px; }
 .terminal h2 { font-size: clamp(40px, 11vw, 80px); font-weight: 780; font-stretch: 82%; line-height: 0.94; letter-spacing: -0.02em; }
 .terminal p { font-size: 17px; color: var(--cartel-suave); max-width: 32ch; line-height: 1.4; }
-.terminal .volver { margin-top: 10px; background: var(--cartel-texto); color: var(--cartel); font-weight: 700; font-size: 16px; padding: 14px 20px; border-radius: 999px; }
+.terminal .riel-final { width: 100%; height: 10px; background: var(--combinacion); margin-bottom: 10px; }
+.terminal .volver { margin-top: 10px; background: var(--cartel-texto); color: var(--cartel); font-weight: 700; font-size: 16px; padding: 15px 22px; }
 
 /* ---------- Recorrido: la línea al pie que avanza una estación por hoja ---------- */
 .recorrido { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; background: var(--anden); border-top: 1px solid var(--junta);
@@ -146,7 +147,7 @@ img { display: block; max-width: 100%; }
 .hoja.una .pieza { flex: 1; }
 .hoja.dos .pieza { flex: 1 1 0; }
 .hoja.dos .pieza .foto { min-height: 140px; }
-.hoja.tres .pieza:first-child { flex: 1 1 auto; }
+.hoja.tres .pieza:first-of-type { flex: 1 1 auto; }
 .hoja.tres .pieza.chica { flex: none; }
 .hoja.tres .pieza.chica .texto { padding: 12px 18px 12px; }
 .hoja.tapa .pieza { flex: 1; }
@@ -207,9 +208,9 @@ html:not(.tableta) .hoja.tapa .pieza .foto { min-height: 200px; }
 .lector .cierre { max-width: 680px; margin: 0 auto; padding: 0 20px calc(var(--seguro-abajo) + 40px); }
 .lector .original { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; color: var(--tinta); text-decoration: none; padding: 12px 0; }
 .lector .original svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 2.2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
-.lector .proxima { display: block; width: 100%; margin-top: 18px; background: var(--linea); color: var(--linea-tinta); padding: 18px 20px; }
-.lector .proxima small { display: block; font-size: 13px; font-weight: 600; opacity: 0.85; }
-.lector .proxima span { display: block; font-size: 19px; font-weight: 700; font-stretch: 92%; line-height: 1.2; margin-top: 4px; }
+.lector .proxima { display: flex; align-items: center; gap: 16px; width: 100%; margin-top: 18px; background: var(--linea); color: var(--linea-tinta); padding: 18px 20px; }
+.lector .proxima span { flex: 1; font-size: 19px; font-weight: 700; font-stretch: 92%; line-height: 1.2; text-wrap: balance; }
+.lector .proxima svg { width: 26px; height: 26px; flex: none; stroke: currentColor; stroke-width: 2.4; fill: none; stroke-linecap: round; stroke-linejoin: round; }
 
 /* ---------- Tableta: el cartel se vuelve franja y la hoja se recompone ---------- */
 .tableta .cartel { grid-template-columns: auto auto 1fr; align-items: center; padding: calc(var(--seguro-arriba) + 14px) 28px 14px; }
@@ -268,6 +269,37 @@ html:not(.tableta) .hoja.tapa .pieza .foto { min-height: 200px; }
 /* Ajustes tras la primera revisión */
 .lector .principal { max-width: none; }
 .lector .barra a { color: inherit; }
-.apertura .estaciones button { font-size: 16px; padding: 6px 0; }
-.apertura .estaciones button span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.apertura .estaciones button { font-size: 15px; padding: 5px 0; }
 .tableta .apertura .estaciones button { font-size: 19px; padding: 8px 0; }
+.apertura .estaciones li.mas { padding: 5px 0; font-size: 15px; font-weight: 500; }
+.apertura .estaciones li.mas::before { width: 11px; height: 11px; left: -27px; top: 9px; background: var(--t); border: 0; }
+
+/* Friso de techo de las hojas interiores: ocupa la franja de la hora del iPhone */
+.friso.techo { height: calc(var(--seguro-arriba) + 10px); }
+.friso.techo.combinacion { background: var(--combinacion); }
+/* En la hoja de dos notas del teléfono manda la foto: la bajada queda para el lector */
+html:not(.tableta) .hoja.dos .bajada { display: none; }
+
+/* ---------- Clave: la primera vez que se abre la app instalada ---------- */
+.clave { position: fixed; inset: 0; z-index: 20; background: var(--cartel); color: var(--cartel-texto);
+  display: grid; place-content: center; justify-items: start; gap: 28px;
+  padding: calc(var(--seguro-arriba) + 24px) 28px calc(var(--seguro-abajo) + 24px); }
+.clave[hidden] { display: none; }
+.clave .calco { width: min(240px, 60vw); height: auto; transform: rotate(-2deg); filter: drop-shadow(0 2px 3px rgb(0 0 0 / 0.35)); }
+.clave form { display: grid; gap: 12px; width: min(420px, 100%); }
+.clave h1 { font-size: 30px; font-weight: 760; font-stretch: 88%; line-height: 1; letter-spacing: -0.01em; }
+.clave p { font-size: 16px; line-height: 1.45; color: var(--cartel-suave); max-width: 34ch; }
+.clave input { font: 600 20px/1.2 var(--marco); padding: 14px 16px; border: 0; background: var(--cartel-texto); color: var(--cartel); width: 100%; border-radius: 0; }
+.clave input:focus-visible { outline: 3px solid #F7A800; outline-offset: 2px; }
+.clave button { justify-self: start; background: var(--cartel-texto); color: var(--cartel); font-weight: 700; font-size: 16px; padding: 15px 22px; }
+.clave button[disabled] { opacity: 0.6; cursor: progress; }
+.clave .error { color: #FF9C8F; font-weight: 600; min-height: 1.45em; }
+
+/* ---------- Aviso de edición nueva: un cartel que baja, nunca te mueve de la hoja ---------- */
+.nueva { position: fixed; z-index: 8; left: 50%; top: calc(var(--seguro-arriba) + 14px); transform: translate(-50%, -160%);
+  background: var(--cartel); color: var(--cartel-texto); font-weight: 650; font-size: 15px; font-variant-numeric: tabular-nums;
+  padding: 12px 18px 12px 14px; display: flex; align-items: center; gap: 10px; white-space: nowrap;
+  box-shadow: 0 8px 24px -8px rgb(0 0 0 / 0.5); transition: transform 420ms var(--salida); }
+.nueva.visible { transform: translate(-50%, 0); }
+.nueva::before { content: ""; width: 26px; height: 8px; background: var(--combinacion); flex: none; }
+.nueva span { color: var(--cartel-suave); font-weight: 500; }

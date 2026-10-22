@@ -23,13 +23,18 @@ ROOT = Path(__file__).resolve().parent.parent
 PALABRAS_POR_MINUTO = 220
 
 
-def notas_del_medio(medio, cuantas, desde):
+def notas_del_medio(medio, cuantas, desde, previas):
     via, _, items = descubrir(medio)
     if not via:
         return medio, []
     recientes = [i for i in items if not i["fecha"] or i["fecha"] >= desde][:cuantas]
     notas = []
     for item in recientes:
+        # Una nota que ya estaba completa en la edición anterior no se vuelve a bajar.
+        previa = previas.get(hashlib.sha1(item["link"].encode()).hexdigest()[:12]) or previas.get(item["link"])
+        if previa and not previa["a_medias"]:
+            notas.append(previa)
+            continue
         link = link_real(item["link"])
         if not link:
             continue
@@ -47,6 +52,7 @@ def notas_del_medio(medio, cuantas, desde):
             "foto": n.get("foto") or item.get("foto", ""),
             "cuerpo_html": n["cuerpo_html"],
             "url": n.get("url_final") or link,
+            "enlace_fuente": item["link"],
             "minutos": max(1, round(n.get("palabras", 0) / PALABRAS_POR_MINUTO)),
             "a_medias": n["veredicto"] == "parcial",
             "motivo": n.get("motivo", ""),
@@ -54,10 +60,15 @@ def notas_del_medio(medio, cuantas, desde):
     return medio, notas
 
 
-def armar(medios, por_medio, horas):
+def armar(medios, por_medio, horas, anterior=None):
     desde = (datetime.now(timezone.utc) - timedelta(hours=horas)).isoformat()
+    previas = {}
+    for n in (anterior or {}).get("notas", []):
+        previas[n["id"]] = n
+        if n.get("enlace_fuente"):
+            previas[n["enlace_fuente"]] = n
     with ThreadPoolExecutor(max_workers=11) as pool:
-        resultados = list(pool.map(lambda m: notas_del_medio(m, por_medio, desde), medios))
+        resultados = list(pool.map(lambda m: notas_del_medio(m, por_medio, desde, previas), medios))
 
     cuadernos, todas = [], []
     for medio, notas in resultados:
@@ -95,7 +106,7 @@ def main():
     args = ap.parse_args()
 
     medios = json.loads((ROOT / "datos/medios.json").read_text())
-    edicion = armar(medios, args.por_medio, args.horas)
+    edicion = armar(medios, args.por_medio, args.horas)  # local: siempre todo de nuevo
     salida = Path(args.salida)
     salida.parent.mkdir(parents=True, exist_ok=True)
     salida.write_text(json.dumps(edicion, ensure_ascii=False))

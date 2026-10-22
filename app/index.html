@@ -7,7 +7,10 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="el diario del pelado">
+<meta name="apple-mobile-web-app-title" content="el pelado">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="marca/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="marca/icono-192.png">
 <title>el diario del pelado</title>
 <link rel="preload" href="fuentes/archivo-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fuentes/alegreya-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
@@ -34,6 +37,20 @@
     <article></article>
     <footer class="cierre"></footer>
   </div>
+
+  <section id="clave" class="clave" aria-labelledby="clave-titulo" hidden>
+    <img class="calco" src="marca/logo-calco-560.webp" alt="el diario del pelado">
+    <form>
+      <h1 id="clave-titulo">Clave de la edición</h1>
+      <p>Las notas viajan cifradas. Escribí la clave una sola vez y queda guardada en este equipo.</p>
+      <label class="oculto" for="frase">Clave</label>
+      <input id="frase" name="frase" type="password" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+      <button type="submit">Abrir la edición</button>
+      <p class="error" aria-live="polite"></p>
+    </form>
+  </section>
+
+  <button id="nueva" class="nueva" type="button" hidden></button>
 
   <p id="aviso" class="oculto" aria-live="polite"></p>
   <script src="app.js" defer></script>
