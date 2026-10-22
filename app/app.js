@@ -27,6 +27,8 @@ const estado = {
   filtro: null,   // id de un medio: la edición sólo con ese medio
   leidas: new Set(),
   biblioteca: new Map(),  // notas guardadas, para más tarde y con marcas (en este equipo)
+  respaldo: new Map(),    // las notas que abriste, por si salen de la biblioteca con el lector abierto
+  temaDe: new Map(),      // id de nota -> ids de las notas que cuentan el mismo hecho (de varios medios)
   notaAbierta: null,
   ocupado: false,
 };
@@ -102,11 +104,13 @@ function textoPlano(html) {
 }
 
 // Una nota y su medio, de la edición o de lo que guardaste (que puede ser de otra edición).
+// Una nota puede no estar en la edición (la guardaste ayer): sale de tu biblioteca o del respaldo
+// de lo que abriste, así guardar, marcar o compartir nunca se quedan sin la nota.
 function notaPorId(id) {
-  return estado.notas.get(id) || estado.biblioteca.get(id)?.nota || null;
+  return estado.notas.get(id) || estado.biblioteca.get(id)?.nota || estado.respaldo.get(id)?.nota || null;
 }
 function medioDe(nota) {
-  return estado.medios.get(nota.medio) || estado.biblioteca.get(nota.id)?.medio;
+  return estado.medios.get(nota.medio) || estado.biblioteca.get(nota.id)?.medio || estado.respaldo.get(nota.id)?.medio;
 }
 
 /* ---------- la biblioteca: guardadas, para más tarde y destacados (IndexedDB) ---------- */
@@ -151,7 +155,17 @@ function registroDe(id) {
 }
 
 /* ---------- piezas ---------- */
-function pieza(id, variante) {
+// Las otras notas del mismo hecho, de otros medios, que están en esta edición.
+function otrasVersiones(id) {
+  const n = estado.notas.get(id);
+  return (estado.temaDe.get(id) || []).filter((o) => o !== id && estado.notas.has(o) && estado.notas.get(o).medio !== n?.medio);
+}
+function nombresDeMedios(ids) {
+  const nombres = [...new Set(ids.map((o) => estado.medios.get(estado.notas.get(o).medio).nombre))];
+  return nombres.length > 1 ? `${nombres.slice(0, -1).join(", ")} y ${nombres.at(-1)}` : nombres[0];
+}
+
+function pieza(id, variante, { seccion = "", conOtras = false } = {}) {
   const n = estado.notas.get(id);
   const m = estado.medios.get(n.medio);
   const p = el("article", `pieza ${variante}`);
@@ -176,11 +190,21 @@ function pieza(id, variante) {
   t.append(el("h2", null, n.titulo));
   if (n.bajada && variante !== "chica") t.append(el("p", "bajada", n.bajada));
   const pie = el("p", "pie");
-  pie.append(insignia(m), document.createTextNode(m.nombre));
-  const detalle = [hora(n.publicada || n.fecha), `${n.minutos} min`].filter(Boolean).join(" · ");
-  pie.append(el("span", "gris", `· ${detalle}`));
+  const otras = conOtras ? otrasVersiones(id) : [];
+  if (variante === "fila") {
+    // En lo destacado de la tapa: la sección al pie (nunca arriba del título), el medio y cuántos más la cuentan.
+    const cuantos = new Set(otras.map((o) => estado.notas.get(o).medio)).size;
+    pie.append(el("b", "seccion", seccion), el("span", "gris",
+      [m.nombre, hora(n.publicada || n.fecha), cuantos ? `y ${cuantos === 1 ? "otro medio" : `${cuantos} medios más`}` : ""].filter(Boolean).join(" · ")));
+  } else {
+    pie.append(insignia(m), document.createTextNode(m.nombre));
+    const detalle = [hora(n.publicada || n.fecha), `${n.minutos} min`].filter(Boolean).join(" · ");
+    pie.append(el("span", "gris", `· ${detalle}`));
+    if (seccion) pie.append(el("span", "gris", `· ${seccion}`));
+  }
   if (n.a_medias) pie.append(el("span", "medias", "· a medias"));
   t.append(pie);
+  if (otras.length && variante !== "fila") t.append(el("p", "otras", `También la cuentan ${nombresDeMedios(otras)}`));
   p.append(t);
   const abrir = el("button", "abrir");
   abrir.type = "button";
@@ -221,7 +245,7 @@ function cartel() {
   return c;
 }
 
-function hojaTapa(ids, seccion) {
+function hojaTapa(ids, seccion, destacadas = []) {
   const h = hojaBase("tapa con-recorrido", "Tapa");
   const lider = estado.medios.get(estado.notas.get(ids[0]).medio);
   const friso = el("div", "friso");
@@ -229,12 +253,25 @@ function hojaTapa(ids, seccion) {
   h.append(cartel(), friso);
   if (estado.modo === "tableta" && ids.length > 1) {
     const g = el("div", `grilla ${estado.orientacion === "vertical" ? "vertical" : ids.length === 2 ? "par" : "mosaico"}`);
-    ids.forEach((id, i) => g.append(pieza(id, i === 0 ? "principal" : "normal")));
+    ids.forEach((id, i) => {
+      const d = destacadas.find((x) => x.id === id);
+      g.append(pieza(id, i === 0 ? "principal" : "normal", { seccion: d ? nombreSeccion(d.seccion) : "", conOtras: Boolean(d) || i === 0 }));
+    });
     h.append(g);
   } else {
-    h.append(pieza(ids[0], "principal"));
+    h.append(pieza(ids[0], "principal", { conOtras: true }));
   }
   h.dataset.seccion = seccion;
+  return h;
+}
+
+// Lo destacado de cada sección, como un índice de la tapa: una fila por sección.
+function hojaResumen(items) {
+  const h = hojaBase("resumen con-recorrido", "Lo destacado de cada sección");
+  h.append(el("div", "friso techo combinacion"));
+  const caja = estado.modo === "tableta" ? el("div", "grilla resumen") : h;
+  for (const it of items) caja.append(pieza(it.id, "fila", { seccion: nombreSeccion(it.seccion), conOtras: true }));
+  if (caja !== h) h.append(caja);
   return h;
 }
 
@@ -352,9 +389,28 @@ function armarHojas() {
     libro.append(elemento);
     estado.hojas.push({ el: elemento, seccion, notas: ids });
   };
-  const tapa = idsDeTapa(estado.secciones);
-  const seccionTapa = estado.secciones.find((s) => s.notas.includes(tapa[0]))?.id || estado.secciones[0].id;
-  sumar(hojaTapa(tapa, seccionTapa), seccionTapa, tapa);
+  const d = estado.edicion.destacadas;
+  let tapa;
+  if (!estado.filtro && d?.principal && estado.notas.has(d.principal)) {
+    // Tapa ampliada: la principal del momento y lo más destacado de cada sección (en su propio tramo).
+    const items = d.secciones.filter((x) => estado.notas.has(x.nota) && x.nota !== d.principal).map((x) => ({ id: x.nota, seccion: x.id }));
+    const arriba = tableta ? items.slice(0, 2) : [];
+    const abajo = tableta ? items.slice(2) : items;
+    const primera = [d.principal, ...arriba.map((x) => x.id)];
+    tapa = [d.principal, ...items.map((x) => x.id)];
+    sumar(hojaTapa(primera, "tapa", arriba), "tapa", primera);
+    const porHoja = tableta ? 6 : estado.orientacion === "horizontal" ? 2 : 4;  // acostado, dos lado a lado
+    for (let i = 0; i < abajo.length; i += porHoja) {
+      const tramo = abajo.slice(i, i + porHoja);
+      const h = hojaResumen(tramo);
+      h.dataset.seccion = "tapa";
+      sumar(h, "tapa", tramo.map((x) => x.id));
+    }
+  } else {
+    tapa = idsDeTapa(estado.secciones);
+    const seccionTapa = estado.secciones.find((s) => s.notas.includes(tapa[0]))?.id || estado.secciones[0].id;
+    sumar(hojaTapa(tapa, seccionTapa), seccionTapa, tapa);
+  }
 
   const patron = tableta ? [["mosaico", 3], ["cuatro", 4], ["trio", 3]] : [["dos", 2], ["una", 1], ["tres", 3]];
   for (const sec of estado.secciones) {
@@ -393,6 +449,7 @@ function marcaDeHoja(h) {
 }
 
 function nombreSeccion(id) {
+  if (id === "tapa") return "Tapa";
   return estado.secciones.find((s) => s.id === id)?.nombre || "";
 }
 
@@ -405,6 +462,10 @@ function pintarRecorrido() {
   if (estado.filtro) recorrido.style.setProperty("--linea", estado.medios.get(estado.filtro).linea.color);
   else riel.classList.add("combinacion");
   via.replaceChildren(riel);
+  // Con muchas hojas, las estaciones se achican para no pisarse (la actual queda grande).
+  const lugar = via.clientWidth / Math.max(1, deSeccion.length);
+  via.classList.toggle("apretada", lugar < 18 && lugar >= 10);
+  via.classList.toggle("muy-apretada", lugar < 10);
   deSeccion.forEach((x, k) => {
     const est = el("span", `estacion ${marcaDeHoja(x)}`);
     if (x.i === estado.actual) est.classList.add("aca");
@@ -680,7 +741,7 @@ let gesto = null;
 let suprimirClic = false;
 
 libro.addEventListener("pointerdown", (ev) => {
-  if (estado.ocupado || ev.button !== 0) return;
+  if (estado.ocupado || gesto || !ev.isPrimary || ev.button !== 0) return;
   gesto = { x: ev.clientX, y: ev.clientY, t: ev.timeStamp, id: ev.pointerId, pliegue: null, sentido: 0 };
 });
 
@@ -696,7 +757,7 @@ libro.addEventListener("pointermove", (ev) => {
     suprimirClic = true;
     const destino = estado.actual + gesto.sentido;
     if (destino < 0 || destino >= estado.hojas.length || reducido.matches) gesto.rebote = true;
-    else gesto.pliegue = crearPliegue(gesto.sentido);
+    else { gesto.pliegue = crearPliegue(gesto.sentido); estado.ocupado = true; }  // teclas y rueda esperan
   }
   if (gesto.pliegue) {
     const largoEje = horizontal ? libro.clientWidth : libro.clientHeight;
@@ -744,6 +805,7 @@ function capaAbierta() {
   return null;
 }
 document.addEventListener("keydown", (ev) => {
+  if (!estado.edicion || ev.target.closest?.("input, textarea, [contenteditable]")) return;
   const capa = capaAbierta();
   if (capa) {
     if (ev.key === "Escape") ({ tarde: cerrarHojita, medios: cerrarMedios, lector: cerrarNota, panel: cerrarPanel, indice: cerrarIndice })[capa]();
@@ -802,6 +864,7 @@ function abrirNota(id, { sinAnimacion = false, marca = null } = {}) {
   const n = notaPorId(id);
   if (!n) return;
   const m = medioDe(n);
+  estado.respaldo.set(id, { nota: n, medio: { id: m.id, nombre: m.nombre, linea: m.linea } });
   estado.notaAbierta = id;
   lector.style.setProperty("--linea", m.linea.color);
   lector.style.setProperty("--linea-tinta", m.linea.tinta);
@@ -812,8 +875,10 @@ function abrirNota(id, { sinAnimacion = false, marca = null } = {}) {
   const art = lector.querySelector("article");
   art.replaceChildren();
   art.append(el("h1", null, n.titulo));
-  if (n.bajada) art.append(el("p", "bajada", n.bajada));
-  const firma = [n.autor, hora(n.fecha || n.publicada)].filter(Boolean).join(" · ");
+  const plano = (t) => t.replace(/\s+/g, " ").trim().toLowerCase();
+  const cuerpoPlano = plano(textoPlano(n.cuerpo_html)).slice(0, 400);
+  if (n.bajada && !cuerpoPlano.startsWith(plano(n.bajada).slice(0, 80))) art.append(el("p", "bajada", n.bajada));
+  const firma = [n.autor, hora(n.fecha || n.publicada), n.a_medias ? "" : `${n.minutos} min de lectura`].filter(Boolean).join(" · ");
   if (firma) art.append(el("p", "firma", firma));
   if (n.foto) {
     const f = el("img", "principal");
@@ -842,6 +907,25 @@ function abrirNota(id, { sinAnimacion = false, marca = null } = {}) {
   original.append(document.createTextNode(n.a_medias ? `Seguir leyendo en ${m.nombre}` : `Ver la nota en ${m.nombre}`));
   original.insertAdjacentHTML("beforeend", ICONO.externo);
   cierre.append(original);
+  const versiones = otrasVersiones(id);
+  if (versiones.length) {
+    const bloque = el("section", "versiones");
+    bloque.setAttribute("aria-label", "Otras versiones de esta noticia");
+    bloque.append(el("h2", null, "También la cuentan"));
+    const ul = el("ul");
+    for (const o of versiones) {
+      const on = estado.notas.get(o);
+      const b = el("button");
+      b.type = "button";
+      b.append(el("b", null, estado.medios.get(on.medio).nombre), el("span", null, on.titulo));
+      b.addEventListener("click", () => { lector.scrollTo({ top: 0 }); abrirNota(o); });
+      const li = el("li");
+      li.append(b);
+      ul.append(li);
+    }
+    bloque.append(ul);
+    cierre.append(bloque);
+  }
   const sig = proximaDe(id);
   if (sig) {
     const b = el("button", "proxima");
@@ -1120,20 +1204,25 @@ hojitaTarde.querySelector(".cancelar").addEventListener("click", cerrarHojita);
 hojitaTarde.addEventListener("click", (ev) => { if (ev.target === hojitaTarde) cerrarHojita(); });
 
 const botonRecordatorio = document.getElementById("recordatorio");
+const porAvisar = new Set();  // vencidas de esta sesión que todavía no abriste desde el aviso
 function revisarRecordatorios() {
   const ahora = Date.now();
-  const vencidas = [...estado.biblioteca.values()].filter((r) => r.masTarde && new Date(r.masTarde).getTime() <= ahora && !r.avisado);
-  if (!vencidas.length || document.hidden) return;
+  const nuevas = [...estado.biblioteca.values()].filter((r) => r.masTarde && new Date(r.masTarde).getTime() <= ahora && !r.avisado);
+  if (!nuevas.length || document.hidden) return;
+  for (const r of nuevas) porAvisar.add(r.id);
+  const vencidas = [...porAvisar].map((id) => estado.biblioteca.get(id)).filter((r) => r?.masTarde);
+  if (!vencidas.length) return;
   botonRecordatorio.replaceChildren(
     el("span", "titulo", vencidas.length === 1 ? `Para leer ahora: ${vencidas[0].nota.titulo}` : `Tenés ${vencidas.length} notas para leer ahora`),
     el("span", null, "· Abrir"));
   botonRecordatorio.dataset.ids = vencidas.map((r) => r.id).join(",");
   botonRecordatorio.hidden = false;
   requestAnimationFrame(() => botonRecordatorio.classList.add("visible"));
-  for (const r of vencidas) { r.avisado = true; persistir(r); }
+  for (const r of nuevas) { r.avisado = true; persistir(r); }
 }
 botonRecordatorio.addEventListener("click", () => {
   const ids = botonRecordatorio.dataset.ids.split(",");
+  porAvisar.clear();
   botonRecordatorio.classList.remove("visible");
   setTimeout(() => { botonRecordatorio.hidden = true; }, 450);
   if (ids.length === 1) abrirNota(ids[0]);
@@ -1497,6 +1586,7 @@ function montar(edicion) {
   estado.edicion = edicion;
   estado.medios = new Map(edicion.medios.map((m) => [m.id, m]));
   estado.notas = new Map(edicion.notas.map((n) => [n.id, n]));
+  estado.temaDe = new Map((edicion.temas || []).flatMap((g) => g.map((id) => [id, g])));
   if (estado.filtro && !estado.medios.has(estado.filtro)) estado.filtro = null;
   const cs = edicion.medios.map((m) => m.linea.color);
   const paso = 100 / cs.length;
@@ -1523,13 +1613,20 @@ async function revisarEdicion() {
 
 botonNueva.addEventListener("click", async () => {
   botonNueva.classList.remove("visible");
+  const esperada = nuevaPendiente;
   try {
     const edicion = await abrirSobre(await traerSobre(), estado.clave);
+    if (edicion.generada === estado.edicion.generada) throw new Error("llegó la misma");
     montar(edicion);
     estado.modo = "";          // fuerza a rearmar las hojas con la edición nueva
     rearmar(true);
     aviso.textContent = `Edición de las ${horaFmt.format(new Date(edicion.generada))} lista.`;
-  } catch { /* si falla, queda la que había */ }
+    if (edicion.generada !== esperada) nuevaPendiente = null;
+  } catch {
+    // Sin señal (o llegó la de antes): queda la que había y el aviso vuelve a aparecer en la próxima revisión.
+    nuevaPendiente = null;
+    avisar("No se pudo traer la edición nueva. Probá en un rato");
+  }
   setTimeout(() => { botonNueva.hidden = true; }, 450);
 });
 

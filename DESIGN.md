@@ -314,6 +314,14 @@ La interacción firma. La hoja se parte por la mitad y la mitad que gira sigue a
 ### Lector
 Sube desde abajo en 420ms sobre el papel de lectura. Barra pegada arriba en chapa: insignia, medio y hora/minutos en letra apagada, y dos botones circulares de 44px (abrir el original, cerrar) con íconos de trazo 2.2. Artículo de 680px: título, bajada, firma, foto principal 3:2, aviso de «Nota a medias» en un recuadro de azulejo con junta, cuerpo. Los enlaces se subrayan con 2px del color de la línea. Al cierre: «Ver la nota en Medio» (o «Seguir leyendo en Medio» si está a medias) y la próxima nota del cuaderno como un bloque del color de la línea con su título entero y una flecha, sin rótulo encima.
 
+### Tapa ampliada
+Tramo propio en el recorrido («Tapa · estación N de M»).
+- Primera hoja: el cartel y la principal grande, con «También la cuentan Medio y Medio» en letra apagada de 13px bajo el pie. En la tableta suma dos destacadas en mosaico.
+- Hojas siguientes («resumen»): una fila por sección con la foto al costado (38 %) y el título del medio.
+  - El pie tiene la sección en negrita en su propio renglón y debajo «Medio · hora · y N medios más». La sección nunca va arriba del título.
+  - Cantidad por hoja: 4 en el teléfono parado, 2 lado a lado acostado, y en la tableta una grilla de 2 columnas con foto arriba (parada) o al costado (acostada).
+- En el lector, antes de la próxima nota, «También la cuentan»: una lista con el medio en apagado y el título de cada versión.
+
 ### Lápiz y anotaciones
 En la barra del lector, el lápiz enciende el marcador: el botón queda en un círculo blanco y aparece al pie una tira de chapa («Tocá una frase para marcarla y una marca para desmarcarla.» + «Listo»). Un toque marca la frase entera, de punto a punto; tocar una marca la desmarca. Sin el lápiz, al elegir un pedazo del texto aparece «Marcar» y al tocar una marca, «Desmarcar». La marca es el color de la línea al 28 %. Tus notas tienen tres pestañas: Guardadas, Más tarde y Anotaciones; en Anotaciones cada marca abre la nota centrada en ella, con un destello breve, y se desmarca con una cruz o con «Desmarcar todo».
 

@@ -1,4 +1,5 @@
-"""Gemini sólo elige la sección de cada nota nueva. Nunca ve ni toca el cuerpo.
+"""Gemini sólo ordena: elige la sección de cada nota nueva y agrupa las notas que cuentan el mismo
+hecho (para la tapa y las "otras versiones"). Nunca ve ni toca el cuerpo.
 
 Le llegan el título, la bajada, el medio y la sección que declara el medio; devuelve
 una categoría de la lista de categorias.py. Si no hay clave, si falla o si responde
@@ -6,6 +7,8 @@ algo fuera de la lista, queda la que dieron las reglas.
 """
 import json
 import os
+import re
+import unicodedata
 import urllib.request
 from pathlib import Path
 
@@ -51,26 +54,39 @@ def _clave():
     return clave
 
 
-def _pedir(modelo, clave, lista):
+ESQUEMA_SECCIONES = {"type": "ARRAY", "items": {
+    "type": "OBJECT",
+    "properties": {"id": {"type": "STRING"}, "categoria": {"type": "STRING", "enum": IDS}},
+    "required": ["id", "categoria"]}}
+
+GUIA_TEMAS = """Te paso notas de distintos medios (id, medio, título y bajada). Agrupá las que cuentan EL MISMO hecho
+puntual: la misma noticia, aunque cada medio la titule distinto (por ejemplo, tres medios sobre la misma declaración
+de Milei, o dos sobre el mismo partido). No agrupes por tema general: "economía argentina" o "Trump" no son un hecho.
+Cada nota va en un solo grupo como máximo. Devolvé sólo los grupos de 2 o más notas, con sus ids."""
+
+ESQUEMA_TEMAS = {"type": "ARRAY", "items": {
+    "type": "OBJECT",
+    "properties": {"ids": {"type": "ARRAY", "items": {"type": "STRING"}}},
+    "required": ["ids"]}}
+
+
+def _generar(modelo, clave, guia, esquema, lista):
     cuerpo = {
-        "systemInstruction": {"parts": [{"text": GUIA}]},
+        "systemInstruction": {"parts": [{"text": guia}]},
         "contents": [{"role": "user", "parts": [{"text": json.dumps(lista, ensure_ascii=False)}]}],
-        "generationConfig": {
-            "temperature": 0,
-            "responseMimeType": "application/json",
-            "responseSchema": {"type": "ARRAY", "items": {
-                "type": "OBJECT",
-                "properties": {"id": {"type": "STRING"}, "categoria": {"type": "STRING", "enum": IDS}},
-                "required": ["id", "categoria"]}},
-        },
+        "generationConfig": {"temperature": 0, "responseMimeType": "application/json", "responseSchema": esquema},
     }
     pedido = urllib.request.Request(
         f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent",
         data=json.dumps(cuerpo).encode(),
         headers={"x-goog-api-key": clave, "content-type": "application/json"})  # la clave nunca va en la dirección
-    respuesta = json.load(urllib.request.urlopen(pedido, timeout=90))
-    texto = respuesta["candidates"][0]["content"]["parts"][0]["text"]
-    return {x["id"]: x["categoria"] for x in json.loads(texto) if x.get("categoria") in IDS}
+    respuesta = json.load(urllib.request.urlopen(pedido, timeout=120))
+    return json.loads(respuesta["candidates"][0]["content"]["parts"][0]["text"])
+
+
+def _pedir(modelo, clave, lista):
+    respuesta = _generar(modelo, clave, GUIA, ESQUEMA_SECCIONES, lista)
+    return {x["id"]: x["categoria"] for x in respuesta if x.get("categoria") in IDS}
 
 
 def clasificar_con_ia(notas, nombres):
@@ -97,3 +113,52 @@ def clasificar_con_ia(notas, nombres):
                 n["por_ia"] = CRITERIO
                 hechas += 1
     return hechas
+
+
+# Palabras que no dicen de qué hecho se trata: no cuentan para comparar dos notas.
+VACIAS = set("""para como pero sobre entre desde hasta tras este esta estos estas ante porque cuando donde tambien luego
+segun contra durante mientras nuevo nueva nuevos nuevas anos hace tiene tienen dijo sera puede pueden todos todas otro
+otra otros otras cada menos muchos mucho ahora hasta antes despues tanto sigue sigan gobierno presidente pais paises
+lunes martes miercoles jueves viernes sabado domingo semana argentina argentino argentinos nacional mundo mundial
+millones parte primer primera ultimo ultima mismo misma donde quien quienes cuales sobre segun hacia luego tener hacer
+fueron estan estaba habia hasta asegura aseguro afirmo explico revelo""".split())
+
+
+def _palabras(n):
+    texto = f"{n['titulo']} {n.get('bajada') or ''}"
+    siglas = {s.lower() for s in re.findall(r"\b[A-ZÁÉÍÓÚÑ]{3,}\b", texto)}
+    plano = "".join(c for c in unicodedata.normalize("NFKD", texto.lower()) if not unicodedata.combining(c))
+    return {w for w in re.findall(r"[a-z0-9]+", plano) if (len(w) >= 5 and w not in VACIAS)} | siglas
+
+
+def _mismo_hecho(a, b):
+    """Control de Gemini: dos notas del mismo hecho comparten al menos dos palabras de peso."""
+    return len(_palabras(a) & _palabras(b)) >= 2
+
+
+def agrupar_temas(notas, nombres):
+    """Grupos de ids de notas que cuentan el mismo hecho (2 o más). Sin clave o si falla: ninguno."""
+    clave = _clave()
+    if not clave or len(notas) < 2:
+        return []
+    lista = [{"id": n["id"], "medio": nombres.get(n["medio"], n["medio"]),
+              "titulo": n["titulo"], "bajada": (n.get("bajada") or "")[:200]} for n in notas]
+    validos = {n["id"] for n in notas}
+    for modelo in MODELOS:
+        try:
+            respuesta = _generar(modelo, clave, GUIA_TEMAS, ESQUEMA_TEMAS, lista)
+            break
+        except Exception as e:
+            print(f"Gemini ({modelo}) no agrupó temas ({type(e).__name__})")
+    else:
+        return []
+    por_id = {n["id"]: n for n in notas}
+    usados, grupos = set(), []
+    for g in respuesta:
+        ids = [i for i in dict.fromkeys(g.get("ids", [])) if i in validos and i not in usados]
+        # Queda en el grupo la nota que se parece a alguna otra del grupo (Gemini a veces junta por provincia).
+        ids = [i for i in ids if any(_mismo_hecho(por_id[i], por_id[j]) for j in ids if j != i)]
+        if len(ids) >= 2:
+            usados.update(ids)
+            grupos.append(ids)
+    return grupos

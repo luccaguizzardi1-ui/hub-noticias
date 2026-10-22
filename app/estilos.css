@@ -33,6 +33,8 @@
   --salida: cubic-bezier(0.16, 1, 0.3, 1);
   --seguro-arriba: env(safe-area-inset-top, 0px);
   --seguro-abajo: env(safe-area-inset-bottom, 0px);
+  --seguro-izq: env(safe-area-inset-left, 0px);
+  --seguro-der: env(safe-area-inset-right, 0px);
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -149,6 +151,9 @@ img { display: block; max-width: 100%; }
 .via .estacion.leida { background: var(--tinta); }
 .via .estacion.a-medias { background: linear-gradient(90deg, var(--tinta) 50%, var(--anden) 50%); }
 .via .estacion.aca { transform: scale(1.45); background: var(--tinta); box-shadow: 0 0 0 3px var(--anden); }
+.via.apretada .estacion:not(.aca) { width: 9px; height: 9px; margin-left: -4.5px; top: 3.5px; border-width: 2px; }
+.via.muy-apretada .estacion:not(.aca) { width: 5px; height: 5px; margin-left: -2.5px; top: 5.5px; border: 0; background: var(--tinta); }
+.via.muy-apretada .estacion:not(.aca):not(.leida) { background: var(--anden); box-shadow: inset 0 0 0 1.5px var(--tinta); }
 .recorrido .leyenda { display: flex; justify-content: space-between; gap: 12px; margin-top: 8px; font-size: 12.5px; font-weight: 600; color: var(--tinta-suave); font-variant-numeric: tabular-nums; }
 .recorrido .leyenda b { color: var(--tinta); font-weight: 700; }
 .recorrido .proxima-seccion svg { width: 13px; height: 13px; margin-right: 4px; vertical-align: -2px; stroke: currentColor; stroke-width: 2.6; fill: none; stroke-linecap: round; stroke-linejoin: round; }
@@ -253,7 +258,7 @@ html:not(.tableta) .hoja.tapa .pieza .foto { min-height: 200px; }
 .tableta .apertura { flex-direction: row; gap: 48px; padding: calc(var(--seguro-arriba) + 48px) 56px 48px; }
 .tableta .apertura .encabezado { flex: 0 0 38%; }
 .tableta .apertura h2 { font-size: clamp(48px, 6vw, 92px); margin-top: 22px; }
-.tableta .apertura .estaciones { margin-top: 0; columns: 1; }
+.tableta .apertura .estaciones { margin-top: 0; }
 .tableta .apertura .estaciones button { font-size: 19px; padding: 9px 0; }
 .tableta .recorrido { padding-left: 28px; padding-right: 28px; }
 .tableta .lector .principal { margin-left: 0; margin-right: 0; width: 100%; }
@@ -503,3 +508,56 @@ html:not(.tableta) .hoja.dos .bajada { display: none; }
   .indice, .panel, .hojita, .hojita .caja, .toast, .desplegable, .desplegable .caja, .flechita { transition: none; }
   .lector .cuerpo mark.resalta { animation: none; }
 }
+
+/* ---------- iPhone acostado: la isla y las esquinas ocupan los costados ---------- */
+.hoja { padding-left: var(--seguro-izq); padding-right: var(--seguro-der); }
+.apertura, .terminal { padding-left: max(24px, calc(var(--seguro-izq) + 16px)); padding-right: max(24px, calc(var(--seguro-der) + 16px)); }
+.recorrido { padding-left: calc(18px + var(--seguro-izq)); padding-right: calc(76px + var(--seguro-der)); }
+.indice-boton { right: calc(14px + var(--seguro-der)); }
+.filtro { right: calc(12px + var(--seguro-der)); }
+.lector .barra { padding-left: calc(18px + var(--seguro-izq)); padding-right: calc(12px + var(--seguro-der)); }
+.panel .barra { padding-left: calc(14px + var(--seguro-izq)); padding-right: calc(8px + var(--seguro-der)); }
+.indice { padding-left: calc(24px + var(--seguro-izq)); padding-right: calc(24px + var(--seguro-der)); }
+.tira-marcar { padding-left: calc(18px + var(--seguro-izq)); padding-right: calc(14px + var(--seguro-der)); }
+
+/* En el teléfono la barra del lector deja lugar al nombre del medio: la hora y los minutos están en la firma */
+@media (max-width: 600px) {
+  .lector .barra .medio span { display: none; }
+}
+
+/* ---------- Tapa ampliada: la principal y lo destacado de cada sección ---------- */
+.pieza .otras { margin-top: 8px; font-size: 13px; font-weight: 600; color: var(--tinta-suave); line-height: 1.35; }
+/* Una fila por sección: la foto al costado, el título del medio y la sección al pie */
+.hoja.resumen .pieza.fila { flex: 1 1 0; }
+.pieza.fila { flex-direction: row; }
+.pieza.fila .foto { flex: 0 0 38%; min-height: 0; }
+.pieza.fila .texto { flex: 1; min-width: 0; align-self: center; padding: 12px 16px 12px 14px; }
+.pieza.fila.sin-foto .texto { padding-left: 18px; }
+.pieza.fila[data-largo] { --t-titulo: 18px; }
+.pieza.fila[data-largo="corto"] { --t-titulo: 21px; }
+.pieza.fila .bajada { display: none; }
+.pieza.fila .pie { flex-wrap: wrap; gap: 2px 6px; margin-top: 8px; }
+.pieza.fila .pie .seccion { flex: 0 0 100%; color: var(--tinta); font-weight: 760; }
+/* Teléfono acostado: dos columnas de filas */
+.horizontal:not(.tableta) .hoja.resumen { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto; grid-auto-rows: 1fr; }
+.horizontal:not(.tableta) .hoja.resumen .friso { grid-column: 1 / -1; }
+.horizontal:not(.tableta) .hoja.resumen .friso + .pieza:last-child { grid-column: 1 / -1; }
+.horizontal:not(.tableta) .hoja.resumen .pieza + .pieza { border-top: 0; }
+/* Tableta: grilla de dos columnas; parada, la foto arriba */
+.tableta .grilla.resumen { grid-template-columns: 1fr 1fr; grid-auto-rows: 1fr; }
+.tableta .grilla.resumen .pieza:last-child:nth-child(odd) { grid-column: 1 / -1; }
+.tableta .pieza.fila[data-largo] { --t-titulo: 23px; }
+.tableta .pieza.fila[data-largo="corto"] { --t-titulo: 27px; }
+.tableta .pieza.fila .texto { padding: 18px 22px; }
+.tableta .grilla.resumen .pieza .bajada { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; font-size: 16px; }
+.tableta:not(.horizontal) .grilla.resumen .pieza.fila { flex-direction: column; }
+.tableta:not(.horizontal) .grilla.resumen .pieza.fila .foto { flex: 1 1 auto; }
+.tableta:not(.horizontal) .grilla.resumen .pieza.fila .texto { align-self: stretch; }
+
+/* Lector: las otras versiones del mismo hecho */
+.lector .versiones { margin-top: 30px; border-top: 1px solid var(--junta); padding-top: 18px; }
+.lector .versiones h2 { font-size: 16px; font-weight: 760; }
+.lector .versiones ul { list-style: none; margin-top: 6px; }
+.lector .versiones button { display: block; width: 100%; text-align: left; padding: 12px 0; border-bottom: 1px solid var(--junta); }
+.lector .versiones b { display: block; font-size: 13px; font-weight: 700; color: var(--tinta-suave); }
+.lector .versiones span { display: block; margin-top: 3px; font-size: 18px; font-weight: 680; font-stretch: 92%; line-height: 1.2; text-wrap: balance; }

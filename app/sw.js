@@ -17,7 +17,9 @@ const ARCHIVOS = [
 ];
 
 self.addEventListener("install", (ev) => {
-  ev.waitUntil(caches.open(APP).then((c) => c.addAll(ARCHIVOS)).then(() => self.skipWaiting()));
+  // cache: "reload" saltea la caché HTTP de GitHub Pages (10 min): la copia nueva nunca guarda archivos viejos.
+  ev.waitUntil(caches.open(APP).then((c) => c.addAll(ARCHIVOS.map((u) => new Request(u, { cache: "reload" }))))
+    .then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", (ev) => {
@@ -29,17 +31,25 @@ self.addEventListener("activate", (ev) => {
   })());
 });
 
-// La edición: primero la red (para tener la última); si no hay conexión, la guardada.
-async function redPrimero(req) {
+// La edición: primero la red (para tener la última). Si no hay conexión, o la red no contesta en
+// 4 segundos (el subte), la guardada; la de la red, si llega después, queda guardada para la próxima.
+const ESPERA_RED = 4000;
+async function redPrimero(ev) {
+  const req = ev.request;
   const cache = await caches.open(EDICION);
-  try {
-    const r = await fetch(req, { cache: "no-store" });
+  const deRed = fetch(req, { cache: "no-store" }).then(async (r) => {
     if (r.ok) await cache.put(req, r.clone());
     return r;
+  });
+  ev.waitUntil(deRed.catch(() => {}));
+  const guardada = await cache.match(req, { ignoreSearch: true });
+  if (!guardada) return deRed;
+  const tarde = new Promise((ok) => setTimeout(() => ok(null), ESPERA_RED));
+  try {
+    const r = await Promise.race([deRed, tarde]);
+    return r && r.ok ? r : guardada;
   } catch {
-    const guardada = await cache.match(req, { ignoreSearch: true });
-    if (guardada) return guardada;
-    throw new Error("sin conexión y sin edición guardada");
+    return guardada;
   }
 }
 
@@ -62,7 +72,7 @@ self.addEventListener("fetch", (ev) => {
   if (req.method !== "GET") return;
   const url = new URL(req.url);
   if (url.origin === location.origin) {
-    if (/(edicion\.cifrada|version)\.json$/.test(url.pathname)) { ev.respondWith(redPrimero(req)); return; }
+    if (/(edicion\.cifrada|version)\.json$/.test(url.pathname)) { ev.respondWith(redPrimero(ev)); return; }
     ev.respondWith(caches.match(req, { ignoreSearch: true }).then((g) => g || fetch(req)));
     return;
   }
