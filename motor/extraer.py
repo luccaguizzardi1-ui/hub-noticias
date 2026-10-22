@@ -191,6 +191,11 @@ def _arc(texto):
     }
 
 
+# Sin una referencia del medio, un texto de RSS más corto que esto suele ser sólo el
+# comienzo de la nota (El País manda unas 150 palabras; MDZ, la nota entera).
+RSS_ENTERO = 300
+
+
 def _desde_feed(nota, item, motivo):
     """La página no se deja leer: usamos el cuerpo que el medio manda en el RSS."""
     p = palabras(texto_de(item.get("contenido")))
@@ -202,8 +207,8 @@ def _desde_feed(nota, item, motivo):
         "palabras": p, "palabras_medio": 0, "muro": False, "cuerpo_html": item["contenido"],
         "parrafos": len(re.findall(r"<p[\s>]", item["contenido"])),
         "fotos_cuerpo": len(re.findall(r"<img\b", item["contenido"])),
-        "veredicto": "completa" if p >= 150 else "parcial",
-        "motivo": f"{motivo}; se usó el texto del RSS" if p >= 150 else "el RSS trae sólo el comienzo",
+        "veredicto": "completa" if p >= RSS_ENTERO else "parcial",
+        "motivo": f"{motivo}; se usó el texto del RSS" if p >= RSS_ENTERO else "el RSS trae sólo el comienzo",
     })
     return nota
 
