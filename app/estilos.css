@@ -38,9 +38,11 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --anden: #121418; --tinta: #ECEBE6; --tinta-suave: #A3A6AD; --junta: #2A2D33; --papel-lector: #15171B; color-scheme: dark;
+    --linea: #ECEBE6; --linea-tinta: #16181D;
   }
 }
-:root[data-theme="dark"] { --anden: #121418; --tinta: #ECEBE6; --tinta-suave: #A3A6AD; --junta: #2A2D33; --papel-lector: #15171B; color-scheme: dark; }
+:root[data-theme="dark"] { --anden: #121418; --tinta: #ECEBE6; --tinta-suave: #A3A6AD; --junta: #2A2D33; --papel-lector: #15171B; color-scheme: dark;
+  --linea: #ECEBE6; --linea-tinta: #16181D; }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; }
@@ -290,7 +292,7 @@ html:not(.tableta) .hoja.dos .bajada { display: none; }
 .clave h1 { font-size: 30px; font-weight: 760; font-stretch: 88%; line-height: 1; letter-spacing: -0.01em; }
 .clave p { font-size: 16px; line-height: 1.45; color: var(--cartel-suave); max-width: 34ch; }
 .clave input { font: 600 20px/1.2 var(--marco); padding: 14px 16px; border: 0; background: var(--cartel-texto); color: var(--cartel); width: 100%; border-radius: 0; }
-.clave input:focus-visible { outline: 3px solid #F7A800; outline-offset: 2px; }
+.clave input:focus-visible { outline: 3px solid var(--cartel-texto); outline-offset: 3px; }
 .clave button { justify-self: start; background: var(--cartel-texto); color: var(--cartel); font-weight: 700; font-size: 16px; padding: 15px 22px; }
 .clave button[disabled] { opacity: 0.6; cursor: progress; }
 .clave .error { color: #FF9C8F; font-weight: 600; min-height: 1.45em; }
@@ -303,3 +305,11 @@ html:not(.tableta) .hoja.dos .bajada { display: none; }
 .nueva.visible { transform: translate(-50%, 0); }
 .nueva::before { content: ""; width: 26px; height: 8px; background: var(--combinacion); flex: none; }
 .nueva span { color: var(--cartel-suave); font-weight: 500; }
+
+/* De noche, los trazos del color de la línea en el lector se aclaran un poco para que se vean */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .lector .cuerpo blockquote::before { color: color-mix(in oklch, var(--linea), #fff 40%); }
+  :root:not([data-theme="light"]) .lector .cuerpo a { text-decoration-color: color-mix(in oklch, var(--linea), #fff 40%); }
+}
+:root[data-theme="dark"] .lector .cuerpo blockquote::before { color: color-mix(in oklch, var(--linea), #fff 40%); }
+:root[data-theme="dark"] .lector .cuerpo a { text-decoration-color: color-mix(in oklch, var(--linea), #fff 40%); }

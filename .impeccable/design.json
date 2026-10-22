@@ -1,0 +1,731 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-22T20:40:23+00:00",
+  "title": "Design System: el diario del pelado",
+  "extensions": {
+    "colorMeta": {
+      "cartel": {
+        "role": "primary",
+        "displayName": "Chapa esmaltada",
+        "canonical": "#16181D",
+        "oklch": "oklch(20.9% 0.010 268.2)",
+        "tonalRamp": [
+          "#090B10",
+          "#24262C",
+          "#43454B",
+          "#63666C",
+          "#868990",
+          "#ABAEB5",
+          "#CED1D8",
+          "#EBEEF6"
+        ]
+      },
+      "cartel-texto": {
+        "role": "primary",
+        "displayName": "Letra de chapa",
+        "canonical": "#FFFFFF",
+        "oklch": "oklch(100.0% 0.000 89.9)",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#262626",
+          "#454545",
+          "#666666",
+          "#898989",
+          "#AEAEAE",
+          "#D1D1D1",
+          "#EEEEEE"
+        ]
+      },
+      "cartel-suave": {
+        "role": "primary",
+        "displayName": "Letra de chapa apagada",
+        "canonical": "#B4B7BF",
+        "oklch": "oklch(77.9% 0.012 269.5)",
+        "tonalRamp": [
+          "#090B10",
+          "#24262C",
+          "#42454C",
+          "#63666D",
+          "#868991",
+          "#ABAEB6",
+          "#CED1D9",
+          "#EBEEF7"
+        ]
+      },
+      "anden": {
+        "role": "neutral",
+        "displayName": "Azulejo blanco frío",
+        "canonical": "#F7F7F4",
+        "oklch": "oklch(97.5% 0.004 106.5)",
+        "tonalRamp": [
+          "#0B0B09",
+          "#272724",
+          "#454543",
+          "#666664",
+          "#898987",
+          "#AEAEAB",
+          "#D1D1CE",
+          "#EFEFEC"
+        ]
+      },
+      "tinta": {
+        "role": "neutral",
+        "displayName": "Tinta",
+        "canonical": "#16181D",
+        "oklch": "oklch(20.9% 0.010 268.2)",
+        "tonalRamp": [
+          "#090B10",
+          "#24262C",
+          "#43454B",
+          "#63666C",
+          "#868990",
+          "#ABAEB5",
+          "#CED1D8",
+          "#EBEEF6"
+        ]
+      },
+      "tinta-suave": {
+        "role": "neutral",
+        "displayName": "Tinta gastada",
+        "canonical": "#50535B",
+        "oklch": "oklch(44.2% 0.014 269.4)",
+        "tonalRamp": [
+          "#090B11",
+          "#24262D",
+          "#42454D",
+          "#63666E",
+          "#868992",
+          "#AAAEB7",
+          "#CDD1DA",
+          "#EBEEF8"
+        ]
+      },
+      "junta": {
+        "role": "neutral",
+        "displayName": "Junta",
+        "canonical": "#DCDCD6",
+        "oklch": "oklch(89.3% 0.008 106.6)",
+        "tonalRamp": [
+          "#0B0B08",
+          "#272722",
+          "#454540",
+          "#666661",
+          "#898984",
+          "#AEAEA9",
+          "#D1D1CB",
+          "#EFEFE9"
+        ]
+      },
+      "papel-lector": {
+        "role": "neutral",
+        "displayName": "Papel de lectura",
+        "canonical": "#FBFBF9",
+        "oklch": "oklch(98.8% 0.003 106.4)",
+        "tonalRamp": [
+          "#0B0B0A",
+          "#262625",
+          "#454543",
+          "#666664",
+          "#898987",
+          "#AEAEAC",
+          "#D1D1CF",
+          "#EEEEEC"
+        ]
+      },
+      "anden-noche": {
+        "role": "neutral",
+        "displayName": "Azulejo de noche",
+        "canonical": "#121418",
+        "oklch": "oklch(19.1% 0.009 264.3)",
+        "tonalRamp": [
+          "#090B0F",
+          "#24262B",
+          "#43454A",
+          "#63666B",
+          "#86898F",
+          "#ABAEB4",
+          "#CED1D7",
+          "#EBEEF4"
+        ]
+      },
+      "tinta-noche": {
+        "role": "neutral",
+        "displayName": "Tinta de noche",
+        "canonical": "#ECEBE6",
+        "oklch": "oklch(93.9% 0.007 97.4)",
+        "tonalRamp": [
+          "#0C0B08",
+          "#272623",
+          "#464541",
+          "#676662",
+          "#8A8985",
+          "#AFAEA9",
+          "#D2D1CC",
+          "#F0EEE9"
+        ]
+      },
+      "tinta-suave-noche": {
+        "role": "neutral",
+        "displayName": "Tinta gastada de noche",
+        "canonical": "#A3A6AD",
+        "oklch": "oklch(72.5% 0.011 267.3)",
+        "tonalRamp": [
+          "#090B10",
+          "#24262C",
+          "#42454B",
+          "#63666C",
+          "#868990",
+          "#ABAEB5",
+          "#CED1D8",
+          "#EBEEF6"
+        ]
+      },
+      "junta-noche": {
+        "role": "neutral",
+        "displayName": "Junta de noche",
+        "canonical": "#2A2D33",
+        "oklch": "oklch(29.7% 0.012 264.4)",
+        "tonalRamp": [
+          "#090B10",
+          "#24262C",
+          "#42454B",
+          "#63666D",
+          "#868990",
+          "#AAAEB6",
+          "#CDD1D9",
+          "#EAEFF7"
+        ]
+      },
+      "papel-lector-noche": {
+        "role": "neutral",
+        "displayName": "Papel de lectura de noche",
+        "canonical": "#15171B",
+        "oklch": "oklch(20.4% 0.009 264.4)",
+        "tonalRamp": [
+          "#090B0F",
+          "#24262B",
+          "#43454A",
+          "#64666B",
+          "#86898E",
+          "#ABAEB3",
+          "#CED1D7",
+          "#ECEEF4"
+        ]
+      },
+      "error-sobre-cartel": {
+        "role": "neutral",
+        "displayName": "Error sobre chapa",
+        "canonical": "#FF9C8F",
+        "oklch": "oklch(79.1% 0.121 28.1)",
+        "tonalRamp": [
+          "#250000",
+          "#530000",
+          "#79231C",
+          "#A0463D",
+          "#C86A5F",
+          "#F18F82",
+          "#FFB7AB",
+          "#FFE2DB"
+        ]
+      },
+      "linea-e-elpais": {
+        "role": "secondary",
+        "displayName": "Línea E · El País",
+        "canonical": "#A0522D",
+        "oklch": "oklch(52.6% 0.115 44.6)",
+        "tonalRamp": [
+          "#240000",
+          "#4F0300",
+          "#742A00",
+          "#9B4D28",
+          "#C2714C",
+          "#EB9670",
+          "#FFB992",
+          "#FFE3CE"
+        ]
+      },
+      "linea-b-bbcmundo": {
+        "role": "secondary",
+        "displayName": "Línea B · BBC Mundo",
+        "canonical": "#00857C",
+        "oklch": "oklch(55.5% 0.097 186.5)",
+        "tonalRamp": [
+          "#001310",
+          "#00322D",
+          "#00554D",
+          "#00776F",
+          "#2F9C92",
+          "#5BC2B8",
+          "#80E6DB",
+          "#9EFFF9"
+        ]
+      },
+      "linea-m-elmundo": {
+        "role": "secondary",
+        "displayName": "Línea M · El Mundo",
+        "canonical": "#E4007C",
+        "oklch": "oklch(59.6% 0.242 358.9)",
+        "tonalRamp": [
+          "#24000A",
+          "#500025",
+          "#850043",
+          "#B90364",
+          "#F12086",
+          "#FF78AC",
+          "#FFB3CF",
+          "#FFDDED"
+        ]
+      },
+      "linea-c-cnnespanol": {
+        "role": "secondary",
+        "displayName": "Línea C · CNN en Español",
+        "canonical": "#F15A22",
+        "oklch": "oklch(66.0% 0.197 38.5)",
+        "tonalRamp": [
+          "#250000",
+          "#580000",
+          "#880000",
+          "#BB2200",
+          "#E65012",
+          "#FF8359",
+          "#FFBA9F",
+          "#FFE3D5"
+        ]
+      },
+      "linea-i-infobae": {
+        "role": "secondary",
+        "displayName": "Línea I · Infobae",
+        "canonical": "#F7A800",
+        "oklch": "oklch(78.9% 0.166 75.1)",
+        "tonalRamp": [
+          "#240000",
+          "#500400",
+          "#752D00",
+          "#9B5100",
+          "#C27600",
+          "#EA9C00",
+          "#FFBF37",
+          "#FFE7AD"
+        ]
+      },
+      "linea-d-eldoce": {
+        "role": "secondary",
+        "displayName": "Línea D · El Doce",
+        "canonical": "#00A651",
+        "oklch": "oklch(63.5% 0.170 151.2)",
+        "tonalRamp": [
+          "#001500",
+          "#003500",
+          "#005B00",
+          "#007F2B",
+          "#00A550",
+          "#46CB74",
+          "#6FF096",
+          "#AFFFC5"
+        ]
+      },
+      "linea-n-lanacion": {
+        "role": "secondary",
+        "displayName": "Línea N · La Nación",
+        "canonical": "#0072BC",
+        "oklch": "oklch(53.8% 0.143 247.6)",
+        "tonalRamp": [
+          "#00013A",
+          "#002267",
+          "#00468C",
+          "#0069B3",
+          "#318EDB",
+          "#5BB5FF",
+          "#7FD9FF",
+          "#B6F5FF"
+        ]
+      },
+      "linea-12-pagina12": {
+        "role": "secondary",
+        "displayName": "Línea 12 · Página/12",
+        "canonical": "#E2231A",
+        "oklch": "oklch(58.5% 0.223 29.1)",
+        "tonalRamp": [
+          "#250000",
+          "#580000",
+          "#870000",
+          "#C60000",
+          "#F2382C",
+          "#FF8271",
+          "#FFB9AC",
+          "#FFE2DB"
+        ]
+      },
+      "linea-p-perfil": {
+        "role": "secondary",
+        "displayName": "Línea P · Perfil",
+        "canonical": "#7B3F98",
+        "oklch": "oklch(48.2% 0.148 313.3)",
+        "tonalRamp": [
+          "#1A0029",
+          "#3E0057",
+          "#60237B",
+          "#8347A1",
+          "#A86BC8",
+          "#CF90F0",
+          "#F3B3FF",
+          "#FFDAFF"
+        ]
+      },
+      "linea-t-tn": {
+        "role": "secondary",
+        "displayName": "Línea T · Todo Noticias",
+        "canonical": "#00A6E0",
+        "oklch": "oklch(68.2% 0.140 232.5)",
+        "tonalRamp": [
+          "#000933",
+          "#002B55",
+          "#004D82",
+          "#0071A8",
+          "#0096CF",
+          "#34BCF7",
+          "#61E0FF",
+          "#97FDFF"
+        ]
+      },
+      "linea-l-eldiplo": {
+        "role": "secondary",
+        "displayName": "Línea L · Le Monde Diplomatique Cono Sur",
+        "canonical": "#8DC63F",
+        "oklch": "oklch(76.1% 0.174 129.6)",
+        "tonalRamp": [
+          "#001200",
+          "#023200",
+          "#235400",
+          "#447700",
+          "#669C00",
+          "#8AC23B",
+          "#ACE763",
+          "#C9FF81"
+        ]
+      }
+    },
+    "derived": {
+      "combinacion": {
+        "displayName": "Combinación",
+        "value": "linear-gradient(90deg, una banda dura por línea en el orden de la edición, 100/11 % cada una)",
+        "source": "app/app.js montar() → --combinacion",
+        "purpose": "Portada, fin de la línea y aviso de edición nueva."
+      },
+      "lineas": {
+        "source": "datos/medios.json linea.{letra,color,tinta}",
+        "cssVars": [
+          "--c",
+          "--t",
+          "--linea",
+          "--linea-tinta"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display de apertura",
+        "purpose": "Nombre del medio en su apertura; en tableta clamp(48px, 6vw, 92px). Fin de la línea: clamp(40px, 11vw, 80px), ancho 82 %."
+      },
+      "headline": {
+        "displayName": "Título del lector",
+        "purpose": "Título de la nota abierta."
+      },
+      "title": {
+        "displayName": "Título de pieza",
+        "purpose": "Escala por largo: corto ≤60 car. 30px, medio ≤100 25px, largo 21px; principal 38/31/26 (teléfono) y 46/38/32 (tableta); chica 19px."
+      },
+      "cartel-hora": {
+        "displayName": "Hora del cartel",
+        "purpose": "«Edición de las HH:MM» y título de la clave."
+      },
+      "body": {
+        "displayName": "Cuerpo de lectura",
+        "purpose": "Texto del medio en el lector, columna de 680px."
+      },
+      "bajada": {
+        "displayName": "Bajada",
+        "purpose": "Bajada en piezas; en el lector clamp(19px, 4.6vw, 23px), 1.38."
+      },
+      "label": {
+        "displayName": "Pie y leyenda",
+        "purpose": "Pie de pieza, leyenda del recorrido (12.5px), firma y epígrafes (13.5px)."
+      },
+      "insignia": {
+        "displayName": "Letra de línea",
+        "purpose": "Letra dentro de la insignia, 46 % del diámetro."
+      }
+    },
+    "fonts": [
+      {
+        "family": "Archivo",
+        "files": [
+          "app/fuentes/archivo-normal-latin.woff2",
+          "app/fuentes/archivo-normal-latin-ext.woff2"
+        ],
+        "weight": "100 900",
+        "stretch": "62% 125%"
+      },
+      {
+        "family": "Alegreya",
+        "files": [
+          "app/fuentes/alegreya-normal-latin.woff2",
+          "app/fuentes/alegreya-normal-latin-ext.woff2",
+          "app/fuentes/alegreya-italic-latin.woff2"
+        ],
+        "weight": "400 900"
+      }
+    ],
+    "shadows": [
+      {
+        "name": "pliegue",
+        "value": "velo #000, opacidad 0 → 0.38 (mitad que gira) y 0.32 → 0 (hoja que se descubre)",
+        "purpose": "Sólo durante el pase de hoja."
+      },
+      {
+        "name": "calcomania",
+        "value": "drop-shadow(0 2px 3px rgb(0 0 0 / 0.35)) + rotate(-2deg)",
+        "purpose": "Logo troquelado sobre la chapa."
+      },
+      {
+        "name": "cartel-que-baja",
+        "value": "0 8px 24px -8px rgb(0 0 0 / 0.5)",
+        "purpose": "Aviso de edición nueva."
+      }
+    ],
+    "motion": [
+      {
+        "name": "salida",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Salida de todo lo que entra o se acomoda."
+      },
+      {
+        "name": "pliegue",
+        "value": "560ms, ease-out cúbico (1 − (1 − p)³), 0 → 180°",
+        "purpose": "Pase de hoja; eje X en teléfono, eje Y en tableta; sigue al dedo."
+      },
+      {
+        "name": "rebote",
+        "value": "380ms, salida, 18px",
+        "purpose": "Intentar pasar más allá del principio o del fin."
+      },
+      {
+        "name": "lector",
+        "value": "420ms, salida, translateY(100%) → 0",
+        "purpose": "Abrir y cerrar el lector."
+      },
+      {
+        "name": "aviso",
+        "value": "420ms, salida, translate(-50%, -160%) → 0",
+        "purpose": "Aviso de edición nueva."
+      },
+      {
+        "name": "recorrido",
+        "value": "300ms, salida",
+        "purpose": "Esconderse sobre aperturas y fin; agrandar la estación actual."
+      },
+      {
+        "name": "insignia",
+        "value": "160ms, salida, scale(0.9)",
+        "purpose": "Toque en una insignia del cartel."
+      },
+      {
+        "name": "reducido",
+        "value": "prefers-reduced-motion: sin pliegue ni transiciones",
+        "purpose": "La hoja cambia directo."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "tableta",
+        "value": "innerWidth >= 700px && innerHeight >= 600px (clase .tableta en <html>)"
+      },
+      {
+        "name": "horizontal",
+        "value": "innerWidth >= innerHeight (clase .horizontal en <html>)"
+      }
+    ],
+    "safeArea": {
+      "techo": "calc(env(safe-area-inset-top) + 10px)",
+      "pie": "calc(env(safe-area-inset-bottom) + 62px) reservado para el recorrido"
+    },
+    "plantillas": {
+      "telefono": {
+        "tapa": 1,
+        "portada": [
+          "dos",
+          "una",
+          "tres"
+        ],
+        "cuaderno": [
+          "una",
+          "dos",
+          "tres"
+        ]
+      },
+      "tableta": {
+        "tapa": "vertical | mosaico (3)",
+        "portada": [
+          "mosaico",
+          "trio",
+          "cuatro"
+        ],
+        "cuaderno": [
+          "mosaico",
+          "cuatro",
+          "trio"
+        ],
+        "ajuste": [
+          "una",
+          "par",
+          "trio"
+        ]
+      }
+    }
+  },
+  "components": [
+    {
+      "name": "Insignia de línea",
+      "kind": "chip",
+      "refersTo": "insignia",
+      "description": "El círculo del subte con la letra del medio; botón al cuaderno en el cartel.",
+      "html": "<div class=\"ds-insignias\"><button class=\"ds-insignia\" style=\"--c:#0072BC;--t:#FFFFFF\" aria-label=\"Ir a La Nación\">N</button><button class=\"ds-insignia\" style=\"--c:#F7A800;--t:#16181D\" aria-label=\"Ir a Infobae\">I</button><button class=\"ds-insignia\" style=\"--c:#E2231A;--t:#FFFFFF\" aria-label=\"Ir a Página/12\">12</button><button class=\"ds-insignia\" style=\"--c:#00A651;--t:#16181D\" aria-label=\"Ir a El Doce\">D</button></div>",
+      "css": ".ds-insignias{display:flex;gap:5px;padding:14px 18px;background:#16181D}.ds-insignia{--tam:27px;width:var(--tam);height:var(--tam);border-radius:50%;border:0;display:inline-grid;place-items:center;background:var(--c);color:var(--t);font-family: Archivo, 'Helvetica Neue', Arial, sans-serif;font-weight:800;font-size:calc(var(--tam)*0.46);font-stretch:90%;line-height:1;letter-spacing:-0.02em;cursor:pointer;transition:transform 160ms cubic-bezier(0.16,1,0.3,1)}.ds-insignia:active{transform:scale(0.9)}.ds-insignia:focus-visible{outline:3px solid #FFFFFF;outline-offset:3px}"
+    },
+    {
+      "name": "Pieza",
+      "kind": "card",
+      "refersTo": "pieza",
+      "description": "Una nota en una hoja: foto a sangre, título entero, bajada en Alegreya y el pie fijo.",
+      "html": "<article class=\"ds-pieza\" style=\"--c:#0072BC;--t:#FFFFFF\"><div class=\"ds-pieza-foto\"></div><div class=\"ds-pieza-texto\"><h2>El Gobierno presentó el presupuesto y abrió la discusión en el Congreso</h2><p class=\"ds-bajada\">El proyecto llega con cambios en las partidas para las provincias.</p><p class=\"ds-pie\"><span class=\"ds-mini\">N</span>La Nación <span class=\"ds-gris\">· 9:42 · 6 min</span></p></div><button class=\"ds-abrir\" aria-label=\"Leer la nota\"></button></article>",
+      "css": ".ds-pieza{position:relative;display:flex;flex-direction:column;background:var(--anden,#F7F7F4);color:var(--tinta,#16181D);max-width:390px;font-family: Archivo, 'Helvetica Neue', Arial, sans-serif;}.ds-pieza-foto{height:200px;background:linear-gradient(135deg,#DCDCD6,#B4B7BF)}.ds-pieza-texto{padding:14px 18px 16px}.ds-pieza h2{margin:0;font-size:25px;font-weight:720;font-stretch:90%;letter-spacing:-0.015em;line-height:1.06;text-wrap:balance}.ds-bajada{margin:8px 0 0;font-family:Alegreya,Georgia,serif;font-size:17px;line-height:1.4;color:var(--tinta-suave,#50535B)}.ds-pie{display:flex;align-items:center;gap:8px;margin:10px 0 0;font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}.ds-gris{color:var(--tinta-suave,#50535B);font-weight:500}.ds-mini{width:22px;height:22px;border-radius:50%;display:inline-grid;place-items:center;background:var(--c);color:var(--t);font-weight:800;font-size:10px;font-stretch:90%}.ds-abrir{position:absolute;inset:0;background:none;border:0;cursor:pointer}.ds-abrir:focus-visible{outline:3px solid var(--c);outline-offset:-4px}"
+    },
+    {
+      "name": "Apertura de cuaderno",
+      "kind": "custom",
+      "refersTo": "apertura",
+      "description": "La pantalla entera del color de la línea, con las notas como estaciones (llena, hueca, partida).",
+      "html": "<section class=\"ds-apertura\" style=\"--c:#7B3F98;--t:#FFFFFF\"><div class=\"ds-placa\"><span class=\"ds-placa-ins\">P</span></div><h2>Perfil</h2><p class=\"ds-resumen\">7 notas · la última, 9:15</p><ol class=\"ds-estaciones\"><li class=\"leida\"><button>La interna que se juega en el Senado</button></li><li class=\"a-medias\"><button>Qué cambia con la nueva ley de alquileres</button></li><li><button>Una semana en la ruta del litio</button></li><li class=\"mas\">y 4 notas más en las próximas hojas</li></ol></section>",
+      "css": ".ds-apertura{background:var(--c);color:var(--t);padding:28px 24px 24px;font-family: Archivo, 'Helvetica Neue', Arial, sans-serif;max-width:390px}.ds-placa-ins{width:64px;height:64px;border-radius:50%;display:inline-grid;place-items:center;background:var(--t);color:var(--c);font-weight:800;font-size:30px;font-stretch:90%}.ds-apertura h2{margin:14px 0 0;font-size:56px;font-weight:780;font-stretch:84%;line-height:0.96;letter-spacing:-0.02em}.ds-resumen{margin:10px 0 0;font-size:15px;font-weight:550;font-variant-numeric:tabular-nums}.ds-estaciones{list-style:none;margin:28px 0 0;padding:0 0 0 34px;position:relative}.ds-estaciones::before{content:'';position:absolute;left:10px;top:10px;bottom:10px;width:5px;background:var(--t);border-radius:3px}.ds-estaciones li{position:relative}.ds-estaciones button{display:block;width:100%;padding:5px 0;background:none;border:0;color:inherit;font:inherit;font-size:15px;font-weight:600;line-height:1.22;text-align:left;cursor:pointer}.ds-estaciones button:focus-visible{outline:3px solid var(--t);outline-offset:3px}.ds-estaciones li::before{content:'';position:absolute;left:-30px;top:9px;width:17px;height:17px;border-radius:50%;background:var(--c);border:4px solid var(--t);box-sizing:border-box}.ds-estaciones li.leida::before{background:var(--t)}.ds-estaciones li.a-medias::before{background:linear-gradient(90deg,var(--t) 50%,var(--c) 50%)}.ds-estaciones li.mas{padding:5px 0;font-size:15px;font-weight:500}.ds-estaciones li.mas::before{width:11px;height:11px;left:-27px;background:var(--t);border:0}"
+    },
+    {
+      "name": "Recorrido",
+      "kind": "nav",
+      "refersTo": "recorrido",
+      "description": "La línea al pie: una estación por hoja, la actual agrandada.",
+      "html": "<nav class=\"ds-recorrido\" style=\"--linea:#00857C\"><div class=\"ds-via\"><div class=\"ds-riel\"></div><span class=\"ds-est leida\" style=\"left:0%\"></span><span class=\"ds-est a-medias\" style=\"left:33.3%\"></span><span class=\"ds-est aca\" style=\"left:66.6%\"></span><span class=\"ds-est\" style=\"left:100%\"></span></div><p class=\"ds-leyenda\"><span><b>BBC Mundo</b> · estación 3 de 4</span><span></span></p></nav>",
+      "css": ".ds-recorrido{background:var(--anden,#F7F7F4);border-top:1px solid var(--junta,#DCDCD6);padding:12px 18px 10px;font-family: Archivo, 'Helvetica Neue', Arial, sans-serif;max-width:390px}.ds-via{position:relative;height:16px;margin:0 8px}.ds-riel{position:absolute;left:0;right:0;top:6px;height:4px;border-radius:2px;background:var(--linea)}.ds-est{position:absolute;top:1px;width:14px;height:14px;margin-left:-7px;border-radius:50%;background:var(--anden,#F7F7F4);border:3px solid var(--tinta,#16181D);box-sizing:border-box;transition:transform 300ms cubic-bezier(0.16,1,0.3,1)}.ds-est.leida{background:var(--tinta,#16181D)}.ds-est.a-medias{background:linear-gradient(90deg,var(--tinta,#16181D) 50%,var(--anden,#F7F7F4) 50%)}.ds-est.aca{transform:scale(1.45);background:var(--tinta,#16181D);box-shadow:0 0 0 3px var(--anden,#F7F7F4)}.ds-leyenda{display:flex;justify-content:space-between;margin:8px 0 0;font-size:12.5px;font-weight:600;color:var(--tinta-suave,#50535B);font-variant-numeric:tabular-nums}.ds-leyenda b{color:var(--tinta,#16181D);font-weight:700}"
+    },
+    {
+      "name": "Barra del lector",
+      "kind": "nav",
+      "refersTo": "lector-barra",
+      "description": "La barra de chapa pegada arriba del lector, con medio, hora y dos botones circulares de 44px.",
+      "html": "<header class=\"ds-barra\"><p class=\"ds-medio\"><span class=\"ds-mini-b\">M</span> El Mundo <span>· 8:10 · 4 min</span></p><button class=\"ds-cerrar\" aria-label=\"Cerrar la nota\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M6 6l12 12M18 6L6 18\"/></svg></button></header>",
+      "css": ".ds-barra{display:flex;align-items:center;gap:10px;padding:10px 12px 10px 18px;background:#16181D;color:#FFFFFF;font-family: Archivo, 'Helvetica Neue', Arial, sans-serif;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;max-width:390px}.ds-medio{flex:1;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ds-medio>span:last-child{color:#B4B7BF;font-weight:500}.ds-mini-b{width:22px;height:22px;border-radius:50%;display:inline-grid;place-items:center;background:#E4007C;color:#FFFFFF;font-weight:800;font-size:10px;vertical-align:-7px;margin-right:4px}.ds-cerrar{width:44px;height:44px;display:grid;place-items:center;border-radius:50%;background:none;border:0;color:inherit;cursor:pointer}.ds-cerrar:active{background:rgb(255 255 255 / 0.12)}.ds-cerrar:focus-visible{outline:3px solid #E4007C;outline-offset:3px}.ds-cerrar svg{width:22px;height:22px;stroke:currentColor;stroke-width:2.2;fill:none;stroke-linecap:round}"
+    },
+    {
+      "name": "Próxima nota",
+      "kind": "button",
+      "refersTo": "lector-proxima",
+      "description": "Al cierre del lector: la próxima nota del cuaderno en el color de la línea, con su título entero y sin rótulo.",
+      "html": "<button class=\"ds-proxima\" style=\"--linea:#F15A22;--linea-tinta:#16181D\"><span>Cómo sigue la ola de calor en el norte del país</span><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M5 12h14M13 6l6 6-6 6\"/></svg></button>",
+      "css": ".ds-proxima{display:flex;align-items:center;gap:16px;width:100%;max-width:390px;border:0;border-radius:0;background:var(--linea);color:var(--linea-tinta);padding:18px 20px;text-align:left;cursor:pointer;font-family: Archivo, 'Helvetica Neue', Arial, sans-serif;}.ds-proxima span{flex:1;font-size:19px;font-weight:700;font-stretch:92%;line-height:1.2;text-wrap:balance}.ds-proxima svg{width:26px;height:26px;flex:none;stroke:currentColor;stroke-width:2.4;fill:none;stroke-linecap:round;stroke-linejoin:round}.ds-proxima:focus-visible{outline:3px solid var(--linea);outline-offset:3px}"
+    },
+    {
+      "name": "Botón sobre chapa",
+      "kind": "button",
+      "refersTo": "boton-cartel",
+      "description": "Chapa invertida: «Volver a la tapa», «Abrir la edición».",
+      "html": "<div class=\"ds-chapa\"><button class=\"ds-btn-chapa\">Volver a la tapa</button></div>",
+      "css": ".ds-chapa{background:#16181D;padding:28px}.ds-btn-chapa{background:#FFFFFF;color:#16181D;border:0;border-radius:0;font-family: Archivo, 'Helvetica Neue', Arial, sans-serif;font-weight:700;font-size:16px;padding:15px 22px;cursor:pointer}.ds-btn-chapa:focus-visible{outline:3px solid #FFFFFF;outline-offset:3px}.ds-btn-chapa[disabled]{opacity:0.6;cursor:progress}"
+    },
+    {
+      "name": "Campo de clave",
+      "kind": "input",
+      "refersTo": "campo-clave",
+      "description": "El único campo de la app: blanco, recto, sobre la chapa.",
+      "html": "<form class=\"ds-clave\"><h1>Clave de la edición</h1><p>Las notas viajan cifradas. Escribí la clave una sola vez y queda guardada en este equipo.</p><label class=\"ds-oculto\" for=\"ds-frase\">Clave</label><input id=\"ds-frase\" type=\"password\"><p class=\"ds-error\">La clave no abre esta edición.</p></form>",
+      "css": ".ds-clave{display:grid;gap:12px;max-width:420px;background:#16181D;color:#FFFFFF;padding:28px;font-family: Archivo, 'Helvetica Neue', Arial, sans-serif;}.ds-clave h1{margin:0;font-size:30px;font-weight:760;font-stretch:88%;line-height:1;letter-spacing:-0.01em}.ds-clave p{margin:0;font-size:16px;line-height:1.45;color:#B4B7BF;max-width:34ch}.ds-clave input{font:600 20px/1.2 Archivo,'Helvetica Neue',Arial,sans-serif;padding:14px 16px;border:0;border-radius:0;background:#FFFFFF;color:#16181D}.ds-clave input:focus-visible{outline:3px solid #FFFFFF;outline-offset:2px}.ds-clave .ds-error{color:#FF9C8F;font-weight:600}.ds-oculto{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}"
+    },
+    {
+      "name": "Aviso de edición nueva",
+      "kind": "custom",
+      "refersTo": "aviso-nueva",
+      "description": "Cartel de chapa que baja; se actualiza sólo si se toca.",
+      "html": "<button class=\"ds-nueva\">Edición de las 10:20 <span>· Actualizar</span></button>",
+      "css": ".ds-nueva{display:flex;align-items:center;gap:10px;white-space:nowrap;background:#16181D;color:#FFFFFF;border:0;border-radius:0;font-family: Archivo, 'Helvetica Neue', Arial, sans-serif;font-weight:650;font-size:15px;font-variant-numeric:tabular-nums;padding:12px 18px 12px 14px;box-shadow:0 8px 24px -8px rgb(0 0 0 / 0.5);cursor:pointer}.ds-nueva::before{content:'';width:26px;height:8px;flex:none;background:linear-gradient(90deg,#A0522D 0 9.09%,#00857C 9.09% 18.18%,#E4007C 18.18% 27.27%,#F15A22 27.27% 36.36%,#F7A800 36.36% 45.45%,#00A651 45.45% 54.54%,#0072BC 54.54% 63.63%,#E2231A 63.63% 72.72%,#7B3F98 72.72% 81.81%,#00A6E0 81.81% 90.9%,#8DC63F 90.9% 100%)}.ds-nueva span{color:#B4B7BF;font-weight:500}.ds-nueva:focus-visible{outline:3px solid #FFFFFF;outline-offset:3px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Andén",
+    "overview": "**Creative North Star: \"Andén\"**\n\nLa edición es una red de subte porteño. El marco (el cartel de estación, las insignias de línea, los frisos de pared, las aperturas de cuaderno y el recorrido al pie) habla en la señalética del subte: chapa esmaltada casi negra con letras blancas, azulejo blanco frío, círculos de color con una letra. Adentro de ese marco, la columna de lectura es calma: papel claro, serif humanista, nada que compita con el texto del medio.\n\nLa densidad es de diario de papel, no de feed. Cada pantalla es una hoja entera: en el teléfono, una, dos o tres notas apiladas; en la tableta, una grilla recompuesta con la principal grande. Las fotos van a sangre, sin esquinas ni sombras de tarjeta, y las piezas se separan con la junta de 1 px entre azulejos. Se pasa la hoja con el dedo y la hoja se dobla por la mitad (hacia arriba en el teléfono, al costado en la tableta) mientras el recorrido avanza una estación.\n\nEl color es estructural y está racionado: los 11 colores de línea sólo aparecen como marcas de señalética (insignia, friso, riel, apertura a pantalla completa, botón de próxima nota). El resto del sistema es chapa, azulejo y tinta.",
+    "keyCharacteristics": [
+      "Chapa oscura para el marco, azulejo blanco frío para las hojas, papel apenas más cálido para leer.",
+      "Once líneas, cada una con letra, color y tinta propia, tomadas de `datos/medios.json`.",
+      "Archivo (ancho variable, angosta) para el marco; Alegreya para la lectura. Ambas autoalojadas.",
+      "Esquinas rectas en todo; el círculo queda reservado para insignias y estaciones.",
+      "Estados como marcas: estación llena = leída, hueca = pendiente, partida = a medias.",
+      "El logo entra como calcomanía troquelada, levemente girada, pegada sobre el cartel."
+    ],
+    "rules": [
+      {
+        "name": "The Línea Sólo Señaliza Rule",
+        "body": "Un color de línea aparece sólo como superficie de señalética (insignia, friso, riel, apertura, botón de próxima nota, subrayado y comilla del lector, selección). Nunca como color de texto sobre el azulejo: Infobae y Le Monde Diplomatique no llegan a 2:1 contra el azulejo.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tinta de la Línea Rule",
+        "body": "Lo que va sobre un color de línea usa la tinta que esa línea declara en `medios.json` (blanca o chapa). No se decide pantalla por pantalla.",
+        "section": "colors"
+      },
+      {
+        "name": "The Combinación Rule",
+        "body": "La portada no tiene color propio: es la estación de combinación y lleva las once bandas. Ningún color de línea solo representa a la edición entera.",
+        "section": "colors"
+      },
+      {
+        "name": "The Título Entero Rule",
+        "body": "Los títulos son del medio y no se cortan nunca. El tamaño se elige por largo: corto (hasta 60 caracteres) 30px, medio (hasta 100) 25px, largo 21px; la principal sube a 38 / 31 / 26px en el teléfono y a 46 / 38 / 32px en la tableta; la pieza chica baja a 19px. Si en una apertura no entran todos, las últimas se resumen en «y N notas más en las próximas hojas». Las bajadas sí pueden recortarse a 4 líneas o esconderse.",
+        "section": "typography"
+      },
+      {
+        "name": "The Marco y Lectura Rule",
+        "body": "Todo lo que es señal (cartel, insignias, títulos, etiquetas, botones) va en Archivo; todo lo que es texto del medio para leer (bajadas, cuerpo, citas) va en Alegreya.",
+        "section": "typography"
+      },
+      {
+        "name": "The Cifras de Andén Rule",
+        "body": "Horas, minutos y conteos llevan cifras tabulares, como un tablero de horarios.",
+        "section": "typography"
+      },
+      {
+        "name": "The Andén Plano Rule",
+        "body": "Ninguna pieza de lectura lleva sombra ni elevación. Si algo flota, es porque físicamente baja sobre la hoja (el aviso) o porque la hoja se está doblando.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Círculo Es Señal Rule",
+        "body": "Un círculo significa línea o estación. No se usa como forma decorativa ni para avatares o chips.",
+        "section": "shapes"
+      }
+    ],
+    "dos": [
+      "**Do** tomar letra, color y tinta de cada línea de `datos/medios.json`; un medio nuevo es una línea nueva con su par color/tinta de al menos 4.5:1.",
+      "**Do** usar la combinación de once bandas para todo lo que represente a la edición entera (portada, fin, aviso de edición nueva).",
+      "**Do** marcar el estado de lectura con forma (llena, hueca, partida), nunca con un color nuevo.",
+      "**Do** elegir el tamaño del título por su largo y resumir lo que no entra con «y N notas más»; los títulos se muestran enteros.",
+      "**Do** sumar `env(safe-area-inset-*)` a todo lo fijo y cubrir la franja de la hora con el friso de techo.",
+      "**Do** componer la tableta con sus propias plantillas, no estirar las del teléfono.",
+      "**Do** usar la calcomanía (`logo-calco`) sobre la chapa, girada -2° y con su sombra corta; el logo no se redibuja ni se recolorea."
+    ],
+    "donts": [
+      "**Don't** usar un color de línea como color de texto sobre el azulejo ni como fondo de una superficie que no sea señal.",
+      "**Don't** redondear esquinas de fotos, piezas, botones o campos; el círculo es sólo para insignias y estaciones.",
+      "**Don't** poner sombras de tarjeta, bordes con sombra ni elevación a las piezas.",
+      "**Don't** cortar un título con puntos suspensivos ni con un clamp de líneas.",
+      "**Don't** poner rótulos o etiquetas sobre los títulos (la próxima nota del lector va sin rótulo; el pie de pieza es la única etiqueta).",
+      "**Don't** cambiar la chapa, las líneas o las aperturas en modo oscuro; sólo cambian los neutros de lectura."
+    ]
+  }
+}
