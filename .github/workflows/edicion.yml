@@ -3,12 +3,15 @@
 # El cron de GitHub no alcanza: es "lo mejor que puede" y con carga saltea corridas sin avisar (el 23/10
 # lanzó 3 de unas 40 y la edición quedó 5 horas quieta). El reloj es la propia edición:
 # - el job "siguiente" espera en el entorno "reloj" (temporizador de 19 minutos del lado de GitHub: no
-#   ocupa máquina ni cuenta como uso), completa los 20 minutos desde el comienzo y pide la próxima;
-# - vigia.yml, cuando termina una edición, la pide si la cadena quedó cortada;
-# - el cron y cada push de código quedan de respaldo para volver a arrancarla.
+#   ocupa máquina ni cuenta como uso), completa los 20 minutos y pide la próxima (.github/scripts/reloj.sh);
+# - vigia.yml es una segunda cadena, con su propio entorno ("reloj-vigia"), que la cuida: si la de la
+#   edición se corta, pide una edición; y cada edición pide un vigía si no hay ninguno vivo;
+# - el cron y cada push de código quedan de respaldo para volver a arrancarlas.
 # Nunca hay dos cadenas: con el grupo de concurrencia, mientras una corrida trabaja sólo puede quedar
 # otra en espera; un pedido nuevo cancela al que esperaba y sigue uno solo.
-# Para frenar la edición: deshabilitar este workflow y cancelar la corrida en curso.
+# Para frenar todo: deshabilitar "Edición" y "Vigía" (las cadenas no piden un workflow deshabilitado a
+# mano). No borrar ni editar los entornos "reloj" y "reloj-vigia": sin temporizador, cada paso
+# "completar" igual sostiene los 20 minutos, pero borrar uno corta su cadena.
 name: Edición
 
 on:
@@ -16,7 +19,7 @@ on:
     - cron: "7,27,47 * * * *"   # respaldo: lejos del minuto 0 que GitHub atrasa
   push:
     branches: [main]
-    paths: [".github/workflows/edicion.yml", "motor/**", "app/**", "datos/**", "requirements.txt"]
+    paths: [".github/workflows/edicion.yml", ".github/scripts/**", "motor/**", "app/**", "datos/**", "requirements.txt"]
   workflow_dispatch:
 
 permissions:
@@ -90,62 +93,65 @@ jobs:
           AVISOS_IPAD: ${{ secrets.AVISOS_IPAD }}
         run: python motor/avisos.py --enviar avisos.json
 
+  # Las corridas encadenadas las pide el bot: si fallan, GitHub no manda mail. Este job abre el issue
+  # «La edición está fallando» (el issue sí llega por mail) y lo cierra cuando una edición sale bien.
+  informe:
+    needs: [armar, publicar, avisar]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      RUN_ID: ${{ github.run_id }}
+      FALLO: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+    steps:
+      - name: Abrir o cerrar el aviso de fallas
+        run: |
+          titulo="La edición está fallando"
+          abierto=$(timeout 60 gh issue list --repo "$REPO" --state open --limit 100 --json number,title \
+            --jq "[.[] | select(.title == \"$titulo\")][0].number // empty") || exit 0
+          if [ "$FALLO" = "true" ] && [ -z "$abierto" ]; then
+            timeout 60 gh issue create --repo "$REPO" --title "$titulo" \
+              --body "La edición falló en https://github.com/$REPO/actions/runs/$RUN_ID. La cadena sigue intentando cada 20 minutos; este aviso se cierra solo cuando una edición sale bien."
+          elif [ "$FALLO" != "true" ] && [ -n "$abierto" ]; then
+            timeout 60 gh issue close "$abierto" --repo "$REPO" --comment "Volvió a salir bien: https://github.com/$REPO/actions/runs/$RUN_ID"
+          fi
+
   # La próxima edición, a los 20 minutos del comienzo de ésta. No depende de los otros jobs: la cadena
-  # sigue aunque esta edición falle. La espera la hace el entorno "reloj" (19 minutos); el paso completa
-  # lo que falte, así que si el entorno faltara o perdiera el temporizador, igual espera durmiendo.
+  # sigue aunque esta edición falle.
   siguiente:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 90   # la espera del entorno no cuenta; los reintentos pueden llevar hasta una hora
     environment:
       name: reloj
       deployment: false
     permissions:
       actions: write   # pedir corridas con el token del repo (workflow_dispatch sí dispara)
       contents: read
-      issues: write    # avisar por issue si la edición falla (las corridas encadenadas no mandan mail)
     env:
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}
       RUN_ID: ${{ github.run_id }}
-      RAMA: ${{ github.ref_name }}
+      RAMA: ${{ github.event.repository.default_branch }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
       - name: Completar los 20 minutos
-        run: |
-          inicio=$(timeout 60 gh api "repos/$REPO/actions/runs/$RUN_ID" --jq .run_started_at || true)
-          desde=$(date -d "${inicio:-now}" +%s 2>/dev/null || date +%s)
-          espera=$(( 1200 - ($(date +%s) - desde) ))
-          (( espera > 1200 )) && espera=1200
-          if (( espera > 0 )); then echo "Faltan $espera s"; sleep "$espera"; fi
-
+        run: bash .github/scripts/reloj.sh completar
       - name: Pedir la próxima edición
-        run: |
-          for intento in 1 2 3 4 5 6 7 8; do
-            timeout 60 gh workflow run edicion.yml --repo "$REPO" --ref "$RAMA" && { echo "Pedida."; exit 0; }
-            echo "No se pudo pedir (intento $intento)"
-            sleep $(( 20 * intento ))
-          done
-          echo "::error::No se pudo pedir la próxima edición: la retoman el vigía o el cron"
-          exit 1
-
-      - name: Avisar si la edición falla
+        run: bash .github/scripts/reloj.sh pedir edicion.yml 60
+      - name: Que el vigía siga vivo
         if: ${{ !cancelled() }}
         run: |
-          fallas=$(timeout 60 gh api "repos/$REPO/actions/runs/$RUN_ID/jobs" \
-            --jq '[.jobs[] | select(.name != "siguiente" and (.conclusion == "failure" or .conclusion == "timed_out" or .conclusion == "cancelled"))] | length' || true)
-          [ -z "$fallas" ] && exit 0   # sin respuesta de la API no se abre ni se cierra nada
-          titulo="La edición está fallando"
-          abierto=$(timeout 60 gh issue list --repo "$REPO" --state open --search "\"$titulo\" in:title" --json number --jq '.[0].number // empty')
-          if [ "${fallas:-0}" != "0" ] && [ -z "$abierto" ]; then
-            gh issue create --repo "$REPO" --title "$titulo" \
-              --body "La edición falló en https://github.com/$REPO/actions/runs/$RUN_ID. La cadena sigue intentando cada 20 minutos; este aviso se cierra solo cuando una edición sale bien."
-          elif [ "${fallas:-0}" = "0" ] && [ -n "$abierto" ]; then
-            gh issue close "$abierto" --repo "$REPO" --comment "Volvió a salir bien: https://github.com/$REPO/actions/runs/$RUN_ID"
+          if [ "$(bash .github/scripts/reloj.sh vivas vigia.yml)" = "0" ]; then
+            bash .github/scripts/reloj.sh pedir vigia.yml 10 || echo "::warning::No pude pedir el vigía: lo intenta la próxima edición"
+          else
+            echo "El vigía está vivo."
           fi
-
       - name: Latido si el repo lleva 30 días sin cambios
         if: ${{ !cancelled() }}
-        run: |
-          ultimo=$(timeout 60 gh api "repos/$REPO/commits?per_page=1" --jq '.[0].commit.committer.date' || true)
-          if [ -n "$ultimo" ] && (( $(date +%s) - $(date -d "$ultimo" +%s) > 30 * 86400 )); then
-            timeout 60 gh workflow run latido.yml --repo "$REPO" --ref "$RAMA" && echo "Pedí el latido."
-          fi
+        run: bash .github/scripts/reloj.sh latido

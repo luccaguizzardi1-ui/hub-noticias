@@ -1,42 +1,46 @@
-# Vigía de la edición: cuando termina una corrida de "Edición", si no quedó ninguna pedida (la cadena
-# se cortó), pide la próxima. No usa el cron de GitHub, que es justo lo que falla.
-# No actúa si la corrida fue cancelada (a mano, o reemplazada por otro pedido) ni si duró menos de
-# 15 minutos: una edición que se cae enseguida no puede armar un bucle; ahí quedan el cron y el push.
+# Vigía de la edición: una segunda cadena, independiente de la de "Edición", que la cuida.
+# Cada corrida espera en su entorno "reloj-vigia" (19 minutos del lado de GitHub, sin máquina), completa
+# los 20, revisa la edición y pide la próxima vigilancia (.github/scripts/reloj.sh). Si la cadena de la
+# edición se cortó, pide una edición; si una corrida quedó trabada, la cancela. A su vez, cada edición
+# pide un vigía si no hay ninguno vivo. Para que se corten las dos a la vez tiene que fallar GitHub por
+# más de una hora (cada pedido reintenta durante una hora), y ahí quedan el cron y el push.
+# (workflow_run no sirve: no se dispara con corridas pedidas por el token del repo; probado el 23/10.)
+# Para frenar todo: deshabilitar "Edición" y "Vigía". No borrar ni editar los entornos.
 name: Vigía
 
 on:
-  workflow_run:
-    workflows: [Edición]
-    types: [completed]
+  schedule:
+    - cron: "17,37,57 * * * *"   # respaldo, como en Edición
+  workflow_dispatch:
 
 permissions:
   actions: write
+  contents: read
 
 concurrency:
   group: vigia
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   vigia:
-    if: ${{ github.event.workflow_run.conclusion != 'cancelled' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 90
+    environment:
+      name: reloj-vigia
+      deployment: false
     env:
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}
-      INICIO: ${{ github.event.workflow_run.run_started_at }}
-      FIN: ${{ github.event.workflow_run.updated_at }}
+      RUN_ID: ${{ github.run_id }}
+      RAMA: ${{ github.event.repository.default_branch }}
     steps:
-      - name: Retomar la cadena si se cortó
-        run: |
-          duro=$(( $(date -d "$FIN" +%s) - $(date -d "$INICIO" +%s) ))
-          echo "La edición duró $duro s"
-          if (( duro < 900 )); then echo "Duró menos de 15 minutos: no la retomo (evita un bucle)"; exit 0; fi
-          sleep 45   # deja aparecer la corrida que pidió "siguiente"
-          activas=$(timeout 60 gh run list --repo "$REPO" --workflow edicion.yml --limit 10 --json status \
-            --jq '[.[] | select(.status != "completed")] | length')
-          if [ "$activas" = "0" ]; then
-            timeout 60 gh workflow run edicion.yml --repo "$REPO" --ref main && echo "La cadena estaba cortada: pedí la próxima edición."
-          else
-            echo "La cadena sigue: $activas corrida(s) pedida(s)."
-          fi
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+      - name: Completar los 20 minutos
+        run: bash .github/scripts/reloj.sh completar
+      - name: Revisar la edición
+        run: bash .github/scripts/reloj.sh revisar
+      - name: Pedir la próxima vigilancia
+        if: ${{ !cancelled() }}
+        run: bash .github/scripts/reloj.sh pedir vigia.yml 60
