@@ -1,0 +1,42 @@
+# Vigía de la edición: cuando termina una corrida de "Edición", si no quedó ninguna pedida (la cadena
+# se cortó), pide la próxima. No usa el cron de GitHub, que es justo lo que falla.
+# No actúa si la corrida fue cancelada (a mano, o reemplazada por otro pedido) ni si duró menos de
+# 15 minutos: una edición que se cae enseguida no puede armar un bucle; ahí quedan el cron y el push.
+name: Vigía
+
+on:
+  workflow_run:
+    workflows: [Edición]
+    types: [completed]
+
+permissions:
+  actions: write
+
+concurrency:
+  group: vigia
+  cancel-in-progress: true
+
+jobs:
+  vigia:
+    if: ${{ github.event.workflow_run.conclusion != 'cancelled' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      INICIO: ${{ github.event.workflow_run.run_started_at }}
+      FIN: ${{ github.event.workflow_run.updated_at }}
+    steps:
+      - name: Retomar la cadena si se cortó
+        run: |
+          duro=$(( $(date -d "$FIN" +%s) - $(date -d "$INICIO" +%s) ))
+          echo "La edición duró $duro s"
+          if (( duro < 900 )); then echo "Duró menos de 15 minutos: no la retomo (evita un bucle)"; exit 0; fi
+          sleep 45   # deja aparecer la corrida que pidió "siguiente"
+          activas=$(timeout 60 gh run list --repo "$REPO" --workflow edicion.yml --limit 10 --json status \
+            --jq '[.[] | select(.status != "completed")] | length')
+          if [ "$activas" = "0" ]; then
+            timeout 60 gh workflow run edicion.yml --repo "$REPO" --ref main && echo "La cadena estaba cortada: pedí la próxima edición."
+          else
+            echo "La cadena sigue: $activas corrida(s) pedida(s)."
+          fi
