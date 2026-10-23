@@ -23,7 +23,8 @@ IDS = [c for c, _ in CATEGORIAS]
 GUIA = """Ordenás las notas de un diario personal argentino en secciones. Para cada nota elegí UNA:
 - politica: política argentina contada por un medio argentino. Gobierno nacional, provincias, Congreso, partidos,
   elecciones, causas judiciales de políticos argentinos y la relación de la Argentina con otros países
-  (Milei de viaje, lo que EE.UU. dice de una ley argentina).
+  (Milei de viaje, lo que EE.UU. dice de una ley argentina). La política de Córdoba (Llaryora, Passerini, la
+  Legislatura, el Concejo, los intendentes) es política argentina y va acá.
 - internacional: política internacional y geopolítica de todo el mundo. Todo lo político que no es local de la
   Argentina: gobiernos, elecciones, partidos y líderes de otros países, diplomacia, guerras y conflictos armados,
   la ONU, la OTAN, la UE. Y la geopolítica en general: alianzas, sanciones, potencias, rutas y recursos estratégicos

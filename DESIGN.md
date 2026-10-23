@@ -322,8 +322,72 @@ Tramo propio en el recorrido («Tapa · estación N de M»).
   - Cantidad por hoja: 4 en el teléfono parado, 2 lado a lado acostado, y en la tableta una grilla de 2 columnas con foto arriba (parada) o al costado (acostada).
 - En el lector, antes de la próxima nota, «También la cuentan»: una lista con el medio en apagado y el título de cada versión.
 
-### Lápiz y anotaciones
-En la barra del lector, el lápiz enciende el marcador: el botón queda en un círculo blanco y aparece al pie una tira de chapa («Tocá una frase para marcarla y una marca para desmarcarla.» + «Listo»). Un toque marca la frase entera, de punto a punto; tocar una marca la desmarca. Sin el lápiz, al elegir un pedazo del texto aparece «Marcar» y al tocar una marca, «Desmarcar». La marca es el color de la línea al 28 %. Tus notas tienen tres pestañas: Guardadas, Más tarde y Anotaciones; en Anotaciones cada marca abre la nota centrada en ella, con un destello breve, y se desmarca con una cruz o con «Desmarcar todo».
+### Resaltador
+Las marcas usan cuatro tintas de lectura, cuadradas, que nunca son superficie de la interfaz ni color de texto.
+
+| Tinta | Fondo de día | Fondo de noche | Trazo |
+| --- | --- | --- | --- |
+| amarillo | #FBE38E | #5A4A14 | #A88000 |
+| verde | #CDEBB6 | #294A23 | #4E9A2E |
+| celeste | #C4E2F6 | #1E3E58 | #2F86C2 |
+| rosa | #F8CCDC | #57283F | #D04A80 |
+
+No se usa el color de la línea del medio, porque cambiaría de nota en nota y no significaría nada. Lo propuesto (la frase tocada, todavía sin guardar) se ve gris. La selección nativa sigue en el color de la línea, para que «estoy eligiendo» no se confunda con «está marcado».
+
+### Marcador (la tira)
+**Gestos:**
+- Tocar una frase la propone y tocar un color la marca.
+- Mantener apretado elige un pedazo exacto.
+- Tocar una marca la elige, con un subrayado de 2px en tinta. Tocar una marca nunca la borra.
+
+**La tira:** es de chapa, va fija al pie en el teléfono y flota centrada bajo la columna en el iPad. Este cartel flotante es la cuarta sombra física.
+
+| Estado | Contenido |
+| --- | --- |
+| nueva | 4 muestras de 44px, separador, «Escribir» y ✕ |
+| marca | lo mismo, con la muestra actual tildada y un tacho coral |
+| pista | sólo la primera vez |
+
+Con teclado: 1–4 cambia el color, E escribe, Borrar borra la marca y Esc cierra.
+
+### Apunte
+**Dónde aparece:**
+- **Teléfono (en línea):** debajo del párrafo donde termina la marca, sobre azulejo, con una raya de 4px del trazo de su color.
+- **iPad acostado (al margen, colgado):** a la derecha de la columna de 680px, que no se mueve, a la altura del primer renglón de su marca.
+- **iPad parado (corrido):** si la nota tiene apuntes, la columna se corre una sola vez para dejarles lugar.
+
+**Cómo se escribe:**
+- **Teléfono:** en una hoja a pantalla completa, sin nada fijo al pie, con «Listo» arriba.
+- **iPad:** ahí mismo en el margen, con «Listo» y «Borrar apunte».
+
+Lo escrito se guarda solo y nunca se descarta.
+
+### Tus notas (el panel)
+**El ítem:**
+- El título va primero y el pie debajo (insignia · medio · hora). Nada va arriba de los títulos.
+- Los encabezados de día van en minúscula de oración: «Hoy», «Ayer», «Martes 20 de octubre».
+- Las acciones son texto subrayado de 44px.
+
+**Por pestaña:**
+- **Guardadas:** PDF · Compartir · Eliminar.
+- **Más tarde:** Cambiar hora · Compartir · Quitar, agrupadas en «Para ahora» y «Más adelante».
+- **Anotaciones:** las marcas en el orden del texto, con su apunte, una ✕ de 44px y las acciones PDF · Compartir · Borrar marcas. Tiene filtro de color desde el segundo color usado.
+
+**Elegir:** casillas cuadradas, «Elegir todas» y un pie con tres botones; el destructivo va último, en coral.
+
+**Lo que borra:** actúa al instante y ofrece «Deshacer» en el aviso, que se pausa mientras lo tocás.
+
+**Coral (#FF9C8F):** sobre chapa es sólo error o destructivo.
+
+### Hojitas de Compartir y PDF
+**Compartir:** «Título, marcas y enlace», «Por mail» y «Para Claude», en botones de dos renglones.
+
+**PDF:** «Título y marcas» o «Nota completa».
+- Se arma en el equipo, con jsPDF incluido en la app y Archivo/Alegreya en TTF.
+- Se entrega por la hoja de compartir de iOS. Si iOS pide un toque nuevo, aparece «Compartir PDF».
+- El PDF va siempre en papel blanco, con las marcas pintadas detrás del texto y los apuntes con raya.
+- Sin fotos ni epígrafes (salvo un epígrafe marcado). Las TTF cubren latín y latín extendido, también la itálica; el caché del service worker lleva la versión de las fuentes («pdf-4.2.1-f2») y sube cada vez que se regeneran.
+- El pie dice el día local de quien exporta («exportado el 22 de octubre de 2026»), el mismo del nombre del archivo.
 
 ### Botón sobre chapa
 Chapa invertida: fondo blanco, letra chapa, Archivo 700 16px, 15px × 22px, esquinas rectas. Es «Volver a la tapa» en el fin y «Abrir la edición» en la clave (al 60 % mientras trabaja).

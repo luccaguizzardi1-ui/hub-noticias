@@ -1,0 +1,26 @@
+# Manda un aviso de prueba al iPhone y al iPad (después de pegar sus códigos como secretos AVISOS_IPHONE / AVISOS_IPAD).
+name: Probar avisos
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Mandar el aviso de prueba
+        env:
+          VAPID_PRIVADA: ${{ secrets.VAPID_PRIVADA }}
+          AVISOS_IPHONE: ${{ secrets.AVISOS_IPHONE }}
+          AVISOS_IPAD: ${{ secrets.AVISOS_IPAD }}
+        run: python motor/avisos.py --prueba

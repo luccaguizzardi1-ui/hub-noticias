@@ -22,17 +22,29 @@ DESAFIO = re.compile(r"Just a moment|cf-chl|Attention Required|captcha|acceso au
 MURO = re.compile(
     r"(nota|contenido) exclusiv[oa] para suscriptores|suscribite para (seguir|continuar) leyendo|"
     r"suscríbete para (seguir|continuar) leyendo|para seguir leyendo,? suscrib|si ya sos suscriptor|"
-    r"exclusivo para assinantes|assine para (continuar|ler)",
+    r"exclusivo para assinantes|assine para (continuar|ler)|suscr[ií]bete a \w+ para seguir leyendo",
     re.I,
 )
 
 
 RELACIONADAS = re.compile(
     r"^(mir[aá]|le[eé]|lea|ver|vea) tambi[eé]n\b|^te puede interesar|^segu[ií] leyendo|"
-    r"^m[aá]s noticias|^notas relacionadas|^comentarios$|^temas:?$",
+    r"^m[aá]s noticias|^notas relacionadas|^comentarios$|^temas:?$|^temas relacionados$",
     re.I,
 )
 TARJETA = ("h3", "h4", "img", "figure", "a")
+# Carteles del sitio metidos en el cuerpo: se saca el bloque sólo si es entero el cartel.
+PROMO = re.compile(
+    r"^(seguir leyendo|ir al contenido|¡?no te pierdas las últimas noticias!?|suscr[ií]bete)$|"
+    r"^suscribite a las notificaciones\b|^(→\s*)?suscr[ií]bete al newsletter\b|^(y )?no olvides suscribirte\b|"
+    r"^si estás leyendo esto es gracias a nuestros\b.{0,60}suscriptores",
+    re.I,
+)
+# Desde el muro del medio hasta el final ya no es la nota (planes y botones).
+CORTE_MURO = re.compile(r"^suscr[ií]bete a \w+ para seguir leyendo", re.I)
+BLOQUES = ("p", "h2", "h3", "h4", "h5", "h6", "li", "div", "blockquote")
+# El crédito que va debajo de una foto ("Fuente de la imagen, AFP", de BBC): es su epígrafe.
+CREDITO = re.compile(r"^(fuente de la imagen|foto|fotografía|imagen|crédito)\s*[,:]", re.I)
 
 
 def palabras(texto):
@@ -40,19 +52,55 @@ def palabras(texto):
 
 
 def depurar(fragmento):
-    """Saca lo que es de la página y no de la nota: bloques "Mirá también",
-    tarjetas de notas relacionadas al final y el rótulo "Comentarios".
-    El texto de la nota no se toca."""
+    """Saca lo que es de la página y no de la nota: bloques "Mirá también", tarjetas de notas
+    relacionadas al final, el rótulo "Comentarios", carteles de newsletter o notificaciones y,
+    desde el cartel del muro, el resto. El texto de la nota no se toca."""
     if not fragmento:
         return ""
     fragmento = re.sub(r"</?(?:html|body|head)\b[^>]*>", "", fragmento)
     div = lhtml.fromstring(f"<div>{fragmento}</div>")
+
+    for el in [e for e in div.iter(*BLOQUES) if e is not div]:
+        if el.getparent() is None:
+            continue
+        texto = re.sub(r"\s+", " ", el.text_content()).strip()
+        if len(texto) < 220 and PROMO.search(texto):
+            el.drop_tree()
+
+    for img in list(div.iter("img")):
+        sig = img.getnext()
+        if img.getparent() is None or img.getparent().tag == "figure" or sig is None or sig.tag != "p" \
+                or (img.tail or "").strip():
+            continue
+        credito = re.sub(r"\s+", " ", sig.text_content()).strip()
+        if len(credito) < 160 and CREDITO.search(credito):
+            figura = lhtml.Element("figure")
+            img.addprevious(figura)
+            figura.append(img)            # append la mueve (con su cola)
+            sig.tag = "figcaption"
+            sig.attrib.clear()
+            figura.append(sig)
 
     hijos = list(div)
     i = 0
     while i < len(hijos):
         el = hijos[i]
         texto = el.text_content().strip()
+        if texto == "Información del artículo" and i + 1 < len(hijos) and hijos[i + 1].tag in ("ul", "ol"):
+            # La ficha de BBC (autor, fecha, tiempo de lectura) ya está arriba de la nota.
+            hijos[i + 1].drop_tree()
+            el.drop_tree()
+            i += 2
+            continue
+        if len(texto) < 120 and CORTE_MURO.search(texto):
+            for h in hijos[i:]:
+                h.drop_tree()
+            break
+        if len(texto) < 40 and re.match(r"(?i)^(temas relacionados|más de [\wáéíóúñ ]+)$", texto) and i >= len(hijos) // 2:
+            # "Temas relacionados" / "Más de Sucesos" (La Voz) en la segunda mitad: de ahí al final ya no es la nota.
+            for h in hijos[i:]:
+                h.drop_tree()
+            break
         if len(texto) < 40 and RELACIONADAS.search(texto):
             el.drop_tree()
             i += 1
@@ -73,6 +121,10 @@ def depurar(fragmento):
     if sum(1 for el in cola if el.tag in ("h3", "h4")) >= 2:
         for el in cola:
             el.drop_tree()
+
+    # Un intertítulo al final, sin nada debajo, quedó de un corte: no es la nota.
+    while len(div) and div[-1].tag in ("h2", "h3", "h4", "h5", "h6") and not (div[-1].tail or "").strip():
+        div[-1].drop_tree()
 
     return (div.text or "") + "".join(lhtml.tostring(c, encoding="unicode") for c in div)
 
@@ -218,15 +270,16 @@ RSS_ENTERO = 300
 
 def _desde_feed(nota, item, motivo):
     """La página no se deja leer: usamos el cuerpo que el medio manda en el RSS."""
-    p = palabras(texto_de(item.get("contenido")))
+    contenido = depurar(item.get("contenido"))
+    p = palabras(texto_de(contenido))
     if p < 80:
         return None
     nota.update({
         "titulo": item.get("titulo", ""), "bajada": item.get("bajada", ""), "autor": "",
         "fecha": item.get("fecha") or "", "foto": item.get("foto", ""), "extractor": "rss",
-        "palabras": p, "palabras_medio": 0, "muro": False, "cuerpo_html": item["contenido"],
-        "parrafos": len(re.findall(r"<p[\s>]", item["contenido"])),
-        "fotos_cuerpo": len(re.findall(r"<img\b", item["contenido"])),
+        "palabras": p, "palabras_medio": 0, "muro": False, "cuerpo_html": contenido,
+        "parrafos": len(re.findall(r"<p[\s>]", contenido)),
+        "fotos_cuerpo": len(re.findall(r"<img\b", contenido)),
         "veredicto": "completa" if p >= RSS_ENTERO else "parcial",
         "motivo": f"{motivo}; se usó el texto del RSS" if p >= RSS_ENTERO else "el RSS trae sólo el comienzo",
     })
@@ -237,7 +290,7 @@ def solo_comienzo(url, item):
     """Medios que elegimos dejar a medias (El País bloquea a la nube): título, bajada,
     foto y el comienzo que manda el RSS, con el link para seguir leyendo en su web.
     No se pide la página."""
-    cuerpo = item.get("contenido") or (f"<p>{html.escape(item['bajada'])}</p>" if item.get("bajada") else "")
+    cuerpo = depurar(item.get("contenido")) or (f"<p>{html.escape(item['bajada'])}</p>" if item.get("bajada") else "")
     return {
         "url": url, "url_final": url, "estado_http": None, "error": None,
         "titulo": item.get("titulo", ""), "bajada": item.get("bajada", ""), "autor": "",
@@ -287,7 +340,7 @@ def extraer(url, item=None):
         "trafilatura": depurar(cuerpo_traf),
         "readability": depurar(cuerpo_read),
         "arc": arc["cuerpo_html"] if arc else "",
-        "rss": item.get("contenido", ""),
+        "rss": depurar(item.get("contenido", "")),
     }
     largos = {k: palabras(texto_de(v)) for k, v in candidatos.items()}
     # Preferencias: el contenido estructurado del medio es la nota exacta; trafilatura
@@ -296,6 +349,11 @@ def extraer(url, item=None):
         extractor = "arc"
     elif largos["readability"] > max(1.4 * largos["trafilatura"], largos["trafilatura"] + 120):
         extractor = "readability"
+    elif largos["rss"] >= 150 and largos["trafilatura"] > 2 * largos["rss"] and \
+            abs(largos["readability"] - largos["rss"]) <= 0.15 * largos["rss"]:
+        # El RSS y Readability coinciden y trafilatura trae el doble: se llevó la página entera
+        # (encabezado y "Leer más" de otras notas, como en Filo News). Vale la nota del medio.
+        extractor = "rss"
     else:
         extractor = "trafilatura"
     if largos["rss"] > 1.3 * largos[extractor] and largos["rss"] >= 150:
@@ -341,4 +399,36 @@ def extraer(url, item=None):
         nota["veredicto"], nota["motivo"] = "parcial", "muro de pago"
     else:
         nota["veredicto"], nota["motivo"] = "completa", ""
+    if muro_ld and nota["veredicto"] in ("completa", "parcial"):
+        # El medio declara la nota sólo para suscriptores: aunque el texto venga escondido en la página,
+        # no se publica entero. Queda el comienzo y el link para seguir leyendo en su sitio.
+        nota["cuerpo_html"] = solo_el_comienzo(nota["cuerpo_html"], minimo=min(70, max(20, nota["palabras"] // 3)))
+        nota["palabras"] = palabras(texto_de(nota["cuerpo_html"]))
+        nota["veredicto"], nota["motivo"] = "parcial", "exclusiva para suscriptores: el comienzo y el link"
     return nota
+
+
+def solo_el_comienzo(cuerpo_html, minimo=70, maximo=3):
+    """Los primeros párrafos de una nota paga (hasta unas 70 palabras, o un tercio si es corta; como mucho 3
+    párrafos). Los párrafos enteros conservan sus enlaces y negritas; el último se corta si se pasa."""
+    try:
+        raiz = lhtml.fragment_fromstring(cuerpo_html, create_parent="div")
+    except Exception:
+        return ""
+    salida, total = [], 0
+    for p in raiz.iter("p"):
+        for br in p.iter("br"):
+            br.tail = " " + (br.tail or "")
+        palabras_p = p.text_content().split()
+        if not palabras_p:
+            continue
+        faltan = minimo - total
+        if len(palabras_p) <= faltan:
+            salida.append(lhtml.tostring(p, encoding="unicode", with_tail=False))
+            total += len(palabras_p)
+        else:
+            salida.append(f"<p>{html.escape(' '.join(palabras_p[:max(faltan, 1)]))}…</p>")
+            total = minimo
+        if total >= minimo or len(salida) >= maximo:
+            break
+    return "".join(salida)

@@ -26,7 +26,7 @@ CATEGORIAS = [
 # aunque sea sobre la Argentina, va a Política internacional, porque es la mirada de otro país.
 DE_AFUERA = {"elpais", "elmundo", "bbcmundo", "cnnespanol", "nytes", "elordenmundial", "legrandcontinent", "infobaeamerica"}
 POR_DEFECTO = {"xataka": "tecnologia", "hipertextual": "tecnologia", "bloomberglinea": "economia",
-               "lpo": "politica", "letrap": "politica"}
+               "lpo": "politica", "letrap": "politica", "elalfil": "politica"}
 
 PAISES = (
     "panama honduras colombia venezuela mexico chile brasil uruguay paraguay bolivia peru ecuador nicaragua guatemala "
@@ -49,7 +49,8 @@ SECCIONES = {
     "sociedad": "sociedad policiales policial seguridad salud educacion informacion-general general ciudad clima "
                 "transito sucesos actualidad judiciales tendencias",
     "internacional": "internacional internacionales el-mundo mundo america latinoamerica " + " ".join(PAISES),
-    "politica": "politica el-pais congreso elecciones gobierno legislatura provincias opinion modo-fontevecchia",
+    "politica": "politica el-pais congreso elecciones gobierno legislatura provincias opinion modo-fontevecchia "
+                "politica-y-economia",
     "otras": "lifestyle turismo gastronomia bienestar viajes horoscopo",
 }
 

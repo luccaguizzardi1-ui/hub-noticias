@@ -32,7 +32,13 @@ jobs:
         env:
           DIARIO_CLAVE: ${{ secrets.DIARIO_CLAVE }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}  # sólo para elegir secciones
-        run: python motor/publicar.py --salida _site --anterior anterior.json
+        run: python motor/publicar.py --salida _site --anterior anterior.json --avisos avisos.json
+      - name: Guardar los avisos de último momento para después de publicar
+        uses: actions/upload-artifact@v4
+        with:
+          name: avisos
+          path: avisos.json
+          retention-days: 1
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
@@ -47,3 +53,25 @@ jobs:
     steps:
       - id: despliegue
         uses: actions/deploy-pages@v4
+
+  # Los avisos salen recién con la edición publicada: al tocar la notificación, la nota ya está.
+  avisar:
+    needs: publicar
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - uses: actions/download-artifact@v4
+        with:
+          name: avisos
+      - name: Mandar los avisos al iPhone y al iPad
+        env:
+          VAPID_PRIVADA: ${{ secrets.VAPID_PRIVADA }}
+          AVISOS_IPHONE: ${{ secrets.AVISOS_IPHONE }}
+          AVISOS_IPAD: ${{ secrets.AVISOS_IPAD }}
+        run: python motor/avisos.py --enviar avisos.json

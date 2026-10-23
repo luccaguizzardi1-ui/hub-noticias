@@ -14,6 +14,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
+from avisos import detectar  # noqa: E402
 from cifrado import cifrar, descifrar  # noqa: E402
 from edicion import armar  # noqa: E402
 
@@ -36,6 +37,7 @@ def main():
     ap.add_argument("--salida", default=str(ROOT / "_site"))
     ap.add_argument("--anterior", default="")
     ap.add_argument("--por-medio", type=int, default=10)
+    ap.add_argument("--avisos", default=str(ROOT / "avisos.json"), help="avisos de último momento para mandar después de publicar")
     args = ap.parse_args()
 
     frase = os.environ.get("DIARIO_CLAVE", "")
@@ -54,6 +56,18 @@ def main():
     edicion = armar(medios, args.por_medio, 36, anterior)
     if len(edicion["notas"]) < 20:
         sys.exit(f"La edición salió con {len(edicion['notas'])} notas: no publico algo tan flaco.")
+
+    # Último momento: lo que hay que avisar queda en un archivo aparte (nunca en el sitio) y el historial,
+    # dentro de la edición cifrada, para no avisar dos veces lo mismo.
+    pendientes, historial = detectar(edicion, (anterior or {}).get("avisos", []), {m["id"]: m["nombre"] for m in medios})
+    if anterior is None:
+        pendientes, historial = [], [a for a in historial if a not in pendientes]   # sin historial no se avisa: no repetir
+    edicion["avisos"] = historial
+    # La nota de un aviso se queda en la edición mientras dure el historial (48 h): tocar el aviso siempre la abre.
+    avisadas = {a["nota"] for a in historial} - {n["id"] for n in edicion["notas"]}
+    edicion["notas"] += [n for n in (anterior or {}).get("notas", []) if n["id"] in avisadas]
+    Path(args.avisos).write_text(json.dumps(pendientes, ensure_ascii=False))
+    print(f"Avisos de último momento: {len(pendientes)}" + "".join(f"\n  · {a['titulo'][:80]}" for a in pendientes))
 
     salida = Path(args.salida)
     if salida.exists():

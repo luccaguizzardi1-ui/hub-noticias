@@ -77,6 +77,71 @@
   "grupo": "aca"
  },
  {
+  "id": "cadena3",
+  "nombre": "Cadena 3",
+  "pais": "Argentina",
+  "web": "https://www.cadena3.com",
+  "sitemap": "https://www.cadena3.com/feed/sitemap-news.xml",
+  "linea": {
+   "letra": "C3",
+   "color": "#006064",
+   "tinta": "#FFFFFF"
+  },
+  "grupo": "aca",
+  "hora_local": true
+ },
+ {
+  "id": "elalfil",
+  "nombre": "El Alfil",
+  "pais": "Argentina",
+  "web": "https://diarioalfil.com.ar",
+  "a_medias": true,
+  "linea": {
+   "letra": "AL",
+   "color": "#C0CA33",
+   "tinta": "#16181D"
+  },
+  "grupo": "aca"
+ },
+ {
+  "id": "lmdiario",
+  "nombre": "La Nueva Mañana",
+  "pais": "Argentina",
+  "web": "https://lmdiario.com.ar",
+  "a_medias": true,
+  "linea": {
+   "letra": "NM",
+   "color": "#5C6BC0",
+   "tinta": "#FFFFFF"
+  },
+  "grupo": "aca"
+ },
+ {
+  "id": "lavoz",
+  "nombre": "La Voz",
+  "pais": "Argentina",
+  "web": "https://www.lavoz.com.ar",
+  "linea": {
+   "letra": "LV",
+   "color": "#B71C1C",
+   "tinta": "#FFFFFF"
+  },
+  "grupo": "aca"
+ },
+ {
+  "id": "cba24n",
+  "nombre": "cba24n",
+  "pais": "Argentina",
+  "web": "https://www.cba24n.com.ar",
+  "feed": "https://www.cba24n.com.ar/rss",
+  "linea": {
+   "letra": "24",
+   "color": "#1B5E20",
+   "tinta": "#FFFFFF"
+  },
+  "grupo": "aca"
+ },
+ {
   "id": "lanacion",
   "nombre": "La Nación",
   "pais": "Argentina",

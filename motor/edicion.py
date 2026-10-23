@@ -27,6 +27,10 @@ from ia import CRITERIO, agrupar_temas, clasificar_con_ia  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 PALABRAS_POR_MINUTO = 220
+# Versión de las reglas de extracción: una nota leída con reglas viejas se vuelve a leer.
+# 2: las notas que el medio declara sólo para suscriptores quedan con el comienzo y el link.
+# 3: sin carteles de newsletter, notificaciones ni muro en el cuerpo; Filo sin la página entera.
+EXTRACCION = 3
 
 
 def texto_limpio(texto, medio=None):
@@ -66,12 +70,17 @@ def _notas_del_medio(medio, cuantas, desde, previas):
     via, _, items = descubrir(medio)
     if not via:
         return []
-    recientes = [i for i in items if not i["fecha"] or i["fecha"] >= desde][:cuantas]
+    unicos = list({i["link"]: i for i in reversed(items)}.values())[::-1]  # Cadena 3 repite cada nota en su sitemap
+    if medio.get("hora_local"):   # escribe la hora de Argentina con "Z": se corrige a UTC
+        for i in unicos:
+            if i.get("fecha"):
+                i["fecha"] = (datetime.fromisoformat(i["fecha"].replace("Z", "+00:00")) + timedelta(hours=3)).isoformat()
+    recientes = [i for i in unicos if not i["fecha"] or i["fecha"] >= desde][:cuantas]
     notas = []
     for item in recientes:
         # Una nota que ya estaba completa en la edición anterior no se vuelve a bajar.
         previa = previas.get(hashlib.sha1(item["link"].encode()).hexdigest()[:12]) or previas.get(item["link"])
-        if previa and not previa["a_medias"]:
+        if previa and not previa["a_medias"] and previa.get("extraccion") == EXTRACCION:
             if "categoria" not in previa:  # ediciones anteriores a las categorías
                 previa["categoria"] = clasificar(previa, medio["id"], item.get("categorias", []))
             notas.append(limpiar_nota(previa, medio))
@@ -84,7 +93,8 @@ def _notas_del_medio(medio, cuantas, desde, previas):
         except Exception as e:
             print(f"[{medio['id']}] salteo una nota ({type(e).__name__}): {item['link']}")
             continue
-        if n["veredicto"] not in ("completa", "parcial") or not n.get("cuerpo_html"):
+        sin_texto = medio.get("a_medias") and not n.get("cuerpo_html")  # sólo el título: se lee en su sitio
+        if n["veredicto"] not in ("completa", "parcial") or not (n.get("cuerpo_html") or sin_texto):
             continue
         nota = {
             "id": hashlib.sha1(link.encode()).hexdigest()[:12],
@@ -92,7 +102,7 @@ def _notas_del_medio(medio, cuantas, desde, previas):
             "titulo": n.get("titulo") or item["titulo"],
             "bajada": n.get("bajada", ""),
             "autor": n.get("autor", ""),
-            "fecha": n.get("fecha") or item.get("fecha") or "",
+            "fecha": (item.get("fecha") if medio.get("hora_local") else n.get("fecha")) or item.get("fecha") or "",
             "publicada": item.get("fecha") or "",
             "foto": n.get("foto") or item.get("foto", ""),
             "cuerpo_html": n["cuerpo_html"],
@@ -102,8 +112,14 @@ def _notas_del_medio(medio, cuantas, desde, previas):
             "a_medias": n["veredicto"] == "parcial",
             "motivo": n.get("motivo", ""),
             "seccion": n.get("seccion") or "",
+            "extraccion": EXTRACCION,
         }
         limpiar_nota(nota, medio)
+        if nota["titulo"] and nota["bajada"].lower().startswith(nota["titulo"][:40].lower()):
+            # Lo que llega de Google News trae como "bajada" el mismo título con el nombre del medio: no es texto.
+            nota["bajada"] = ""
+            if nota["a_medias"]:
+                nota["cuerpo_html"] = ""
         nota["categoria"] = clasificar(nota, medio["id"], item.get("categorias", []))
         notas.append(nota)
     return notas
@@ -125,6 +141,11 @@ def mezclar(notas):
 # Panamá) quedan al final de la sección en vez de mezclarse con las de la Argentina.
 PRIMERO_LO_DE_ACA = {"sociedad", "economia", "deportes", "cultura"}
 
+
+# La política de Córdoba es muy importante para Lucca: la tapa le reserva una fila propia.
+CORDOBESES = {"eldoce", "cadena3", "elalfil", "lmdiario", "lavoz", "cba24n"}
+CORDOBESES_PUROS = {"elalfil", "lmdiario"}   # todo lo que publican es de Córdoba
+CORDOBA = re.compile(r"c[oó]rdoba|cordob[eé]s|llaryora|passerini|unicameral|de loredo|luis juez", re.IGNORECASE)
 
 SERVICIO = re.compile(r"^[^\w¿¡\"“'«]|en vivo|minuto a minuto|a cu[aá]nto (cotiz|cerr)|cotizaci[oó]n (de )?hoy", re.IGNORECASE)
 
@@ -220,6 +241,15 @@ def elegir_destacadas(todas, temas, grupo, google):
         _, nota, ids = c[0]
         usados.add(ids[0])
         salida["secciones"].append({"id": cat_id, "nota": nota["id"]})
+        if cat_id == "politica":
+            # Justo después de Política argentina: lo más destacado de la política de Córdoba.
+            de_cordoba = [x for x in candidatos("politica")
+                          if any(por_id[i]["medio"] in CORDOBESES_PUROS or CORDOBA.search(f'{por_id[i]["titulo"]} {por_id[i].get("bajada") or ""}')
+                                 for i in x[2])]
+            if de_cordoba:
+                _, nota_c, ids_c = de_cordoba[0]
+                usados.add(ids_c[0])
+                salida["secciones"].append({"id": "cordoba", "nota": nota_c["id"]})
     return salida
 
 
@@ -275,6 +305,7 @@ def armar(medios, por_medio, horas, anterior=None):
         "tapa": tapa,
         "destacadas": destacadas,
         "temas": temas,
+        "google": {i: v for i, v in google.items() if v},  # puntos de Google por nota: para los avisos
         "secciones": secciones,
         "notas": todas,
     }

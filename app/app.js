@@ -10,8 +10,6 @@ const indice = document.getElementById("indice");
 const indiceBoton = document.getElementById("indice-boton");
 const panel = document.getElementById("guardadas");
 const hojitaTarde = document.getElementById("mas-tarde");
-const botonDestacar = document.getElementById("destacar");
-const tiraMarcar = document.getElementById("tira-marcar");
 const chipFiltro = document.getElementById("filtro");
 const toast = document.getElementById("toast");
 
@@ -89,11 +87,50 @@ function trozos(lista, patron) {
   return hojas;
 }
 let esperaToast = 0;
-function avisar(texto) {
-  toast.textContent = texto;
-  toast.classList.add("visible");
+let deshacerToast = null, cierreToast = 0, pausado = false;
+function anularDeshacer() {
+  if (!deshacerToast) return;
+  deshacerToast = null;
+  toast.classList.remove("visible");
+  toast.querySelector(".deshacer").hidden = true;
+}
+function programarCierre(ms) {
   clearTimeout(esperaToast);
-  esperaToast = setTimeout(() => toast.classList.remove("visible"), 2800);
+  cierreToast = ms;
+  esperaToast = setTimeout(() => {
+    if (pausado) return;
+    toast.classList.remove("visible");
+    toast.querySelector(".deshacer").hidden = true;
+    deshacerToast = null;
+  }, ms);
+}
+// Avisos breves. Con «Deshacer» duran más y se pausan mientras los tocás o tienen el foco.
+function avisar(texto, deshacer = null, { duracion = 0, detalle = "" } = {}) {
+  toast.querySelector(".texto").textContent = texto;
+  toast.querySelector(".detalle").textContent = detalle;
+  const b = toast.querySelector(".deshacer");
+  b.hidden = !deshacer;
+  deshacerToast = deshacer;
+  toast.classList.toggle("con-accion", Boolean(deshacer));
+  toast.classList.add("visible");
+  pausado = false;
+  programarCierre(duracion || (deshacer ? 6000 : 2800));
+}
+toast.querySelector(".deshacer").addEventListener("click", async () => {
+  const f = deshacerToast;
+  deshacerToast = null;
+  toast.classList.remove("visible");
+  if (f) { await f(); avisar("Listo, como estaba"); }
+});
+for (const ev of ["pointerenter", "touchstart", "focusin"]) toast.addEventListener(ev, () => { pausado = true; clearTimeout(esperaToast); }, { passive: true });
+for (const ev of ["pointerleave", "touchend", "focusout"]) {
+  toast.addEventListener(ev, () => {
+    setTimeout(() => {
+      if (toast.contains(document.activeElement)) return;
+      pausado = false;
+      programarCierre(Math.max(2500, cierreToast / 2));
+    }, 0);
+  }, { passive: true });
 }
 function textoPlano(html) {
   const doc = new DOMParser().parseFromString(`<div>${html}</div>`, "text/html");
@@ -114,37 +151,73 @@ function medioDe(nota) {
 }
 
 /* ---------- la biblioteca: guardadas, para más tarde y destacados (IndexedDB) ---------- */
+let baseAbierta = null;
 function abrirBase() {
-  return new Promise((ok, mal) => {
+  if (baseAbierta) return baseAbierta;
+  baseAbierta = new Promise((ok, mal) => {
     const r = indexedDB.open("diario-del-pelado", 2);
     r.onupgradeneeded = () => {
       const db = r.result;
       if (!db.objectStoreNames.contains("claves")) db.createObjectStore("claves");
       if (!db.objectStoreNames.contains("biblioteca")) db.createObjectStore("biblioteca", { keyPath: "id" });
     };
-    r.onsuccess = () => ok(r.result);
-    r.onerror = () => mal(r.error);
+    r.onsuccess = () => {
+      const db = r.result;
+      db.onclose = () => { baseAbierta = null; };          // iOS la cierra al volver del fondo
+      db.onversionchange = () => { db.close(); baseAbierta = null; };
+      ok(db);
+    };
+    r.onerror = () => { baseAbierta = null; mal(r.error); };
   });
+  return baseAbierta;
 }
 async function cargarBiblioteca() {
   try {
     const db = await abrirBase();
-    const todos = await new Promise((ok) => {
+    const todos = await new Promise((ok, mal) => {
       const r = db.transaction("biblioteca").objectStore("biblioteca").getAll();
       r.onsuccess = () => ok(r.result || []);
-      r.onerror = () => ok([]);
+      r.onerror = () => mal(r.error);
     });
+    for (const r of todos) r.destacados = (r.destacados || []).map(normalizarMarca);
     estado.biblioteca = new Map(todos.map((x) => [x.id, x]));
-  } catch { estado.biblioteca = new Map(); }
+    estado.sinBiblioteca = false;
+  } catch {
+    // No se pudo leer: no se escribe nada hasta poder leer, para no pisar lo guardado con una lista vacía.
+    estado.biblioteca = new Map();
+    estado.sinBiblioteca = true;
+  }
 }
 async function persistir(registro) {
+  if (estado.sinBiblioteca) {
+    await cargarBiblioteca();
+    if (estado.sinBiblioteca) { avisar("No pude leer lo que tenés guardado: no guardo nada para no pisarlo"); return false; }
+    // Ya se pudo leer: el registro de memoria se mezcla con lo que había guardado de esa nota.
+    const guardado = estado.biblioteca.get(registro.id);
+    if (guardado && guardado !== registro) {
+      const ids = new Set(registro.destacados.map((d) => d.id));
+      registro.destacados.push(...guardado.destacados.filter((d) => !ids.has(d.id)));
+      registro.guardada ||= guardado.guardada;
+      registro.masTarde ||= guardado.masTarde;
+    }
+  }
   const vacio = !registro.guardada && !registro.masTarde && !registro.destacados.length;
   if (vacio) estado.biblioteca.delete(registro.id); else estado.biblioteca.set(registro.id, registro);
   try {
     const db = await abrirBase();
-    const almacen = db.transaction("biblioteca", "readwrite").objectStore("biblioteca");
-    if (vacio) almacen.delete(registro.id); else almacen.put(registro);
-  } catch { avisar("No se pudo guardar en este equipo"); }
+    await new Promise((ok, mal) => {
+      const t = db.transaction("biblioteca", "readwrite");
+      const almacen = t.objectStore("biblioteca");
+      if (vacio) almacen.delete(registro.id); else almacen.put(registro);
+      t.oncomplete = ok;
+      t.onabort = t.onerror = () => mal(t.error);
+    });
+    return true;
+  } catch {
+    baseAbierta = null;
+    avisar("No se pudo guardar en este equipo (puede estar lleno)");
+    return false;
+  }
 }
 function registroDe(id) {
   const existente = estado.biblioteca.get(id);
@@ -450,6 +523,7 @@ function marcaDeHoja(h) {
 
 function nombreSeccion(id) {
   if (id === "tapa") return "Tapa";
+  if (id === "cordoba") return "Política de Córdoba";  // la fila propia de Córdoba en la tapa
   return estado.secciones.find((s) => s.id === id)?.nombre || "";
 }
 
@@ -797,7 +871,11 @@ libro.addEventListener("wheel", (ev) => {
 }, { passive: false });
 
 function capaAbierta() {
+  if (!hojaApunte.hidden) return "apunte";
+  if (!hojitaExportar.hidden) return "exportar";
+  if (!hojitaCompartir.hidden) return "compartir";
   if (!hojitaTarde.hidden) return "tarde";
+  if (!hojitaAvisos.hidden) return "avisos";
   if (!desplegable.hidden) return "medios";
   if (lector.classList.contains("abierto")) return "lector";
   if (!panel.hidden) return "panel";
@@ -805,10 +883,11 @@ function capaAbierta() {
   return null;
 }
 document.addEventListener("keydown", (ev) => {
-  if (!estado.edicion || ev.target.closest?.("input, textarea, [contenteditable]")) return;
+  if (!estado.edicion || ev.target.closest?.("textarea, [contenteditable], input:not([type=checkbox])")) return;
   const capa = capaAbierta();
+  if (capa === "lector" && teclaDelMarcador(ev)) { ev.preventDefault(); return; }
   if (capa) {
-    if (ev.key === "Escape") ({ tarde: cerrarHojita, medios: cerrarMedios, lector: cerrarNota, panel: cerrarPanel, indice: cerrarIndice })[capa]();
+    if (ev.key === "Escape" && capa !== "apunte") ({ exportar: cerrarExportar, compartir: cerrarCompartir, tarde: cerrarHojita, avisos: cerrarAvisos, medios: cerrarMedios, lector: cerrarNota, panel: cerrarPanel, indice: cerrarIndice })[capa]();
     return;
   }
   if (["ArrowDown", "ArrowRight", "PageDown", " "].includes(ev.key)) { ev.preventDefault(); pasar(1); }
@@ -863,6 +942,8 @@ function proximaDe(id) {
 function abrirNota(id, { sinAnimacion = false, marca = null } = {}) {
   const n = notaPorId(id);
   if (!n) return;
+  if (apunteAbierto) { if (!hojaApunte.hidden) cerrarApunte(); else cerrarEdicionAlMargen(); }
+  clearTimeout(temporizadorPista);
   const m = medioDe(n);
   estado.respaldo.set(id, { nota: n, medio: { id: m.id, nombre: m.nombre, linea: m.linea } });
   estado.notaAbierta = id;
@@ -890,13 +971,15 @@ function abrirNota(id, { sinAnimacion = false, marca = null } = {}) {
   }
   if (n.a_medias) {
     const medias = el("p", "medias");
-    medias.append(el("b", null, "Nota a medias. "), document.createTextNode(`${m.nombre} sólo deja leer el comienzo desde acá. La nota completa está en su sitio.`));
+    // Algunos medios (El Alfil, La Nueva Mañana) no dejan leer nada desde la app: sólo llega el título.
+    medias.append(el("b", null, "Nota a medias. "), document.createTextNode(n.cuerpo_html
+      ? `${m.nombre} sólo deja leer el comienzo desde acá. La nota completa está en su sitio.`
+      : `${m.nombre} no deja leer sus notas desde acá. La nota entera está en su sitio.`));
     art.append(medias);
   }
   const cuerpo = el("div", "cuerpo");
   cuerpo.append(...limpiarCuerpo(n.cuerpo_html, n.foto, n.url).childNodes);
   art.append(cuerpo);
-  for (const d of estado.biblioteca.get(id)?.destacados || []) marcarTexto(cuerpo, d.texto);
 
   const cierre = lector.querySelector(".cierre");
   cierre.replaceChildren();
@@ -904,7 +987,7 @@ function abrirNota(id, { sinAnimacion = false, marca = null } = {}) {
   original.href = n.url;
   original.target = "_blank";
   original.rel = "noopener";
-  original.append(document.createTextNode(n.a_medias ? `Seguir leyendo en ${m.nombre}` : `Ver la nota en ${m.nombre}`));
+  original.append(document.createTextNode(!n.cuerpo_html ? `Leer en ${m.nombre}` : n.a_medias ? `Seguir leyendo en ${m.nombre}` : `Ver la nota en ${m.nombre}`));
   original.insertAdjacentHTML("beforeend", ICONO.externo);
   cierre.append(original);
   const versiones = otrasVersiones(id);
@@ -950,9 +1033,31 @@ function abrirNota(id, { sinAnimacion = false, marca = null } = {}) {
     requestAnimationFrame(() => requestAnimationFrame(() => lector.classList.add("abierto")));
   }
   for (const n2 of [libro, recorrido, indiceBoton, chipFiltro, panel]) n2.inert = true;
+  estado.marcaElegida = null;
+  cerrarMarcador();
+  estado.versionPintada = estado.notas.has(id) && estado.notas.get(id) === n ? "edicion" : "copia";
+  repintarMarcas();
+  // Si alguna marca no aparece en esta versión de la nota pero sí en la copia que guardaste, se lee esa copia.
+  const regAbierto = estado.biblioteca.get(id);
+  if (estado.marcasPerdidas.size && regAbierto?.nota?.cuerpo_html && regAbierto.nota.cuerpo_html !== n.cuerpo_html) {
+    const antes = estado.marcasPerdidas.size;
+    cuerpo.replaceChildren(...limpiarCuerpo(regAbierto.nota.cuerpo_html, n.foto, n.url).childNodes);
+    estado.versionPintada = "copia";
+    repintarMarcas();
+    if (estado.marcasPerdidas.size > antes) {
+      cuerpo.replaceChildren(...limpiarCuerpo(n.cuerpo_html, n.foto, n.url).childNodes);
+      estado.versionPintada = "edicion";
+      repintarMarcas();
+    }
+  }
+  observadorCuerpo?.disconnect();
+  observadorCuerpo = window.ResizeObserver ? new ResizeObserver(reacomodarApuntes) : null;
+  observadorCuerpo?.observe(cuerpo);
+  for (const img of art.querySelectorAll("img")) if (!img.complete) img.addEventListener("load", reacomodarApuntes, { once: true });
   lector.querySelector("button.cerrar").focus({ preventScroll: true });
+  if (!marca) temporizadorPista = setTimeout(mostrarPistaSiHaceFalta, reducido.matches ? 0 : 460);
   // Desde Anotaciones: la nota se abre en la marca que tocaste.
-  const enMarca = marca && [...cuerpo.querySelectorAll("mark")].find((x) => x.dataset.texto === marca);
+  const enMarca = marca && cuerpo.querySelector(`mark[data-id="${marca}"].ini`);
   if (enMarca) {
     // Las fotos de arriba cargan después y empujan el texto: se vuelve a centrar mientras cargan,
     // salvo que ya hayas empezado a mover la nota.
@@ -964,7 +1069,7 @@ function abrirNota(id, { sinAnimacion = false, marca = null } = {}) {
     centrar();
     for (const img of art.querySelectorAll("img")) if (!img.complete) img.addEventListener("load", centrar, { once: true });
     setTimeout(centrar, 460);  // cuando termina de subir el lector
-    enMarca.classList.add("resalta");
+    for (const m of cuerpo.querySelectorAll(`mark[data-id="${marca}"]`)) m.classList.add("resalta");
   }
 
   estado.leidas.add(id);
@@ -978,9 +1083,11 @@ function abrirNota(id, { sinAnimacion = false, marca = null } = {}) {
 
 function cerrarNota() {
   lector.classList.remove("abierto");
+  if (apunteAbierto) { if (!hojaApunte.hidden) cerrarApunte(); else cerrarEdicionAlMargen(); }
+  clearTimeout(temporizadorPista);
+  cerrarMarcador();
+  observadorCuerpo?.disconnect();
   estado.notaAbierta = null;
-  botonDestacar.hidden = true;
-  ponerMarcador(false);
   // Si la abriste desde tus notas, volvés a tus notas.
   for (const n of [libro, recorrido, indiceBoton, chipFiltro]) n.inert = !panel.hidden;
   panel.inert = false;
@@ -1010,49 +1117,276 @@ lector.querySelector(".guardar").addEventListener("click", async () => {
 lector.querySelector(".compartir").addEventListener("click", () => compartir([estado.notaAbierta], "compartir"));
 lector.querySelector(".tarde").addEventListener("click", () => abrirHojita(estado.notaAbierta));
 
-/* ---------- marcar: el lápiz marca frases enteras; también se puede elegir un pedazo ---------- */
-// Envuelve en <mark> la primera aparición de `texto` dentro de `raiz`, aunque cruce negritas o enlaces.
-function marcarTexto(raiz, texto) {
-  const buscado = texto.replace(/\s+/g, " ").trim();
-  if (!buscado) return false;
-  const nodos = [];
-  let total = "";
-  const w = document.createTreeWalker(raiz, NodeFilter.SHOW_TEXT);
-  while (w.nextNode()) { nodos.push({ n: w.currentNode, desde: total.length }); total += w.currentNode.data; }
-  let normal = "";
-  const mapa = [];
-  let enBlanco = false;
-  for (let i = 0; i < total.length; i++) {
-    if (/\s/.test(total[i])) {
-      if (!enBlanco) { normal += " "; mapa.push(i); }
-      enBlanco = true;
-    } else { normal += total[i]; mapa.push(i); enBlanco = false; }
-  }
-  const k = normal.indexOf(buscado);
-  if (k < 0) return false;
-  const inicio = mapa[k], fin = mapa[k + buscado.length - 1] + 1;
-  for (const { n, desde } of nodos) {
-    const hasta = desde + n.data.length;
-    if (hasta <= inicio || desde >= fin) continue;
-    const a = Math.max(inicio, desde) - desde, b = Math.min(fin, hasta) - desde;
-    let tramo = n;
-    if (a > 0) tramo = n.splitText(a);
-    if (b - a < tramo.data.length) tramo.splitText(b - a);
-    const mark = el("mark");
-    mark.dataset.texto = buscado;
-    tramo.replaceWith(mark);
-    mark.append(tramo);
-  }
-  return true;
+/* ---------- marcas: tocás una frase (o elegís un pedazo) y un color. Color, apunte al lado y borrar ---------- */
+// Cada marca: { id, texto, color, apunte, creado, editado, ancla:{inicio, antes, despues} }.
+// Se ubica en el texto por su contenido y su contexto (el ancla), nunca por posición del DOM.
+const COLORES = ["amarillo", "verde", "celeste", "rosa"];
+const COLOR_SINGULAR = { amarillo: "amarilla", verde: "verde", celeste: "celeste", rosa: "rosa" };
+const COLOR_PLURAL = { amarillo: "amarillas", verde: "verdes", celeste: "celestes", rosa: "rosas" };
+const marcador = document.getElementById("marcador");
+const hojaApunte = document.getElementById("apunte");
+const BLOQUE_TEXTO = "p, li, h2, h3, h4, blockquote, figcaption, td, th";
+
+function fnv1a32(s) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return h >>> 0;
 }
-function desmarcar(raiz, texto) {
-  for (const m of [...raiz.querySelectorAll("mark")].filter((x) => x.dataset.texto === texto)) m.replaceWith(...m.childNodes);
-  raiz.normalize();
+const textoLimpio = (t) => (t || "").normalize("NFC").replace(/\s+/g, " ").trim();
+const idNuevoDeMarca = () => `mk-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+// Marcas guardadas por versiones anteriores ({texto, creado}): se completan en memoria, sin reescribir la base.
+function normalizarMarca(d) {
+  d.texto = textoLimpio(d.texto);
+  if (!d.id) d.id = `mk-v1-${fnv1a32(d.texto).toString(16)}`;
+  if (!COLORES.includes(d.color)) d.color = "amarillo";
+  if (typeof d.apunte !== "string") d.apunte = "";
+  if (!("editado" in d)) d.editado = null;
+  if (!("ancla" in d)) d.ancla = null;
+  return d;
+}
+function pedirPersistencia() {
+  if (leerMemoria("persistencia-pedida", false)) return;
+  guardarMemoria("persistencia-pedida", true);
+  navigator.storage?.persist?.().catch(() => {});
 }
 
-// La frase que hay bajo el dedo: del punto anterior al siguiente, dentro del mismo párrafo.
+// El texto del cuerpo, normalizado (espacios simples y un espacio entre bloques), con el camino de vuelta al DOM.
+function indiceDeTexto(raiz) {
+  const normal = [], mapa = [], bloqueDe = [];
+  const desdeNodo = new Map();
+  let bloque = null, nBloque = -1, enBlanco = true;
+  const w = document.createTreeWalker(raiz, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
+    acceptNode: (n) => {
+      if (n.nodeType === Node.ELEMENT_NODE) {
+        if (n.matches("aside.apunte, .margen")) return NodeFilter.FILTER_REJECT;
+        return n.tagName === "BR" ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+      }
+      return n.parentElement.closest("aside.apunte, .margen") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+    },
+  });
+  while (w.nextNode()) {
+    const nodo = w.currentNode;
+    if (nodo.nodeType === Node.ELEMENT_NODE) {   // <br>: un espacio, para que no se peguen las palabras
+      if (!enBlanco && normal.length) { normal.push(" "); mapa.push(null); bloqueDe.push(nBloque); enBlanco = true; }
+      continue;
+    }
+    const nfc = nodo.data.normalize("NFC");
+    if (nfc !== nodo.data) nodo.data = nfc;
+    const b = nodo.parentElement.closest(BLOQUE_TEXTO) || raiz;
+    if (b !== bloque) {
+      if (normal.length && !enBlanco) { normal.push(" "); mapa.push(null); bloqueDe.push(-1); }
+      bloque = b;
+      nBloque++;
+      enBlanco = true;
+    }
+    const d = nodo.data;
+    const offs = new Int32Array(d.length + 1);
+    for (let i = 0; i < d.length; i++) {
+      const c = d[i];
+      if (/\s/.test(c)) {
+        offs[i] = Math.max(0, normal.length - (enBlanco ? 1 : 0));
+        if (!enBlanco) { normal.push(" "); mapa.push({ n: nodo, o: i }); bloqueDe.push(nBloque); enBlanco = true; }
+      } else {
+        offs[i] = normal.length;
+        normal.push(c);
+        mapa.push({ n: nodo, o: i });
+        bloqueDe.push(nBloque);
+        enBlanco = false;
+      }
+    }
+    offs[d.length] = normal.length;
+    desdeNodo.set(nodo, offs);
+  }
+  return { normal: normal.join(""), mapa, bloqueDe, desdeNodo };
+}
+// De un punto del DOM (nodo + offset) a una posición del texto normalizado.
+function posicionDe(indice, nodo, offset) {
+  if (nodo.nodeType === Node.TEXT_NODE) {
+    const offs = indice.desdeNodo.get(nodo);
+    return offs ? offs[Math.min(offset, offs.length - 1)] : null;
+  }
+  const desde = nodo.childNodes[offset] || null;
+  const w = document.createTreeWalker(nodo, NodeFilter.SHOW_TEXT);
+  if (desde) {
+    // El primer texto desde ese hijo en adelante (dentro del mismo elemento).
+    w.currentNode = desde;
+    let t = desde.nodeType === Node.TEXT_NODE ? desde : w.nextNode();
+    while (t && !indice.desdeNodo.has(t)) t = w.nextNode();
+    if (t) return indice.desdeNodo.get(t)[0];
+  }
+  // El límite cae al final del elemento: el final de su último texto.
+  let ultimo = null;
+  const w2 = document.createTreeWalker(nodo, NodeFilter.SHOW_TEXT);
+  while (w2.nextNode()) if (indice.desdeNodo.has(w2.currentNode)) ultimo = w2.currentNode;
+  return ultimo ? indice.desdeNodo.get(ultimo).at(-1) : null;
+}
+function rangoDom(indice, inicio, fin) {
+  let a = inicio, b = fin - 1;
+  while (a < fin && !indice.mapa[a]) a++;
+  while (b >= a && !indice.mapa[b]) b--;
+  if (a > b) return null;
+  const r = document.createRange();
+  r.setStart(indice.mapa[a].n, indice.mapa[a].o);
+  r.setEnd(indice.mapa[b].n, indice.mapa[b].o + 1);
+  return r;
+}
+// Envuelve [inicio, fin) del texto en elementos (uno por nodo de texto), de atrás para adelante.
+function envolver(indice, inicio, fin, crear) {
+  const tramos = [];
+  for (let i = inicio; i < fin; i++) {
+    const e = indice.mapa[i];
+    if (!e) continue;
+    const ult = tramos.at(-1);
+    if (ult && ult.n === e.n && e.o >= ult.hasta) ult.hasta = e.o + 1;
+    else tramos.push({ n: e.n, desde: e.o, hasta: e.o + 1 });
+  }
+  const hechos = [];
+  for (const t of tramos.reverse()) {
+    let nodo = t.n;
+    if (t.hasta < nodo.data.length) nodo.splitText(t.hasta);
+    if (t.desde > 0) nodo = nodo.splitText(t.desde);
+    const env = crear();
+    nodo.replaceWith(env);
+    env.append(nodo);
+    hechos.unshift(env);
+  }
+  return hechos;
+}
+function resolverMarca(indice, marca) {
+  const { normal } = indice;
+  const t = marca.texto;
+  if (!t) return null;
+  const hallados = [];
+  for (let k = normal.indexOf(t); k >= 0; k = normal.indexOf(t, k + 1)) hallados.push(k);
+  if (!hallados.length) return null;
+  let mejor = hallados[0];
+  const a = marca.ancla;
+  if (a && hallados.length > 1) {
+    const puntaje = (i) => {
+      let s = 0;
+      const antes = normal.slice(Math.max(0, i - a.antes.length), i);
+      while (s < antes.length && antes[antes.length - 1 - s] === a.antes[a.antes.length - 1 - s]) s++;
+      const despues = normal.slice(i + t.length, i + t.length + a.despues.length);
+      let p = 0;
+      while (p < despues.length && despues[p] === a.despues[p]) p++;
+      return s + p;
+    };
+    mejor = hallados.reduce((m, i) => {
+      const pm = puntaje(m), pi = puntaje(i);
+      return pi > pm || (pi === pm && Math.abs(i - a.inicio) < Math.abs(m - a.inicio)) ? i : m;
+    });
+  }
+  return { inicio: mejor, fin: mejor + t.length };
+}
+const anclaDe = (indice, inicio, fin) => ({ inicio, antes: indice.normal.slice(Math.max(0, inicio - 32), inicio), despues: indice.normal.slice(fin, fin + 32) });
+
+// Repinta todas las marcas y los apuntes de la nota abierta desde los datos (nunca se mueven nodos a mano).
+function repintarMarcas() {
+  const cuerpo = lector.querySelector(".cuerpo");
+  if (!cuerpo) return;
+  quitarPropuesta();
+  for (const m of cuerpo.querySelectorAll("mark[data-id]")) m.replaceWith(...m.childNodes);
+  for (const a of lector.querySelectorAll("aside.apunte, .margen")) a.remove();
+  cuerpo.normalize();
+  const reg = estado.biblioteca.get(estado.notaAbierta);
+  const indice = indiceDeTexto(cuerpo);
+  estado.marcasPerdidas = new Set();
+  const ubicadas = [];
+  let anclasNuevas = false;
+  for (const d of reg?.destacados || []) {
+    const r = resolverMarca(indice, d);
+    if (!r) { estado.marcasPerdidas.add(d.id); continue; }
+    if (!d.ancla) { d.ancla = anclaDe(indice, r.inicio, r.fin); anclasNuevas = true; }
+    ubicadas.push({ d, inicio: r.inicio, fin: r.fin });
+  }
+  for (const u of [...ubicadas].sort((a, b) => b.inicio - a.inicio)) {
+    const partes = envolver(indice, u.inicio, u.fin, () => {
+      const m = el("mark");
+      m.dataset.id = u.d.id;
+      m.dataset.color = u.d.color;
+      return m;
+    });
+    if (!partes.length) continue;
+    partes[0].classList.add("ini");
+    partes[0].tabIndex = 0;
+    partes[0].setAttribute("aria-describedby", `desc-${u.d.id}`);
+    partes.at(-1).classList.add("fin");
+    partes.at(-1).classList.toggle("con-apunte", Boolean(u.d.apunte));
+  }
+  estado.ubicadas = ubicadas.sort((a, b) => a.inicio - b.inicio);
+  let desc = lector.querySelector(".descripciones");
+  if (!desc) { desc = el("div", "oculto descripciones"); lector.append(desc); }
+  desc.replaceChildren(...ubicadas.map((u) => {
+    const s = el("span", null, `Marca ${COLOR_SINGULAR[u.d.color]}.${u.d.apunte ? " Con apunte." : ""}`);
+    s.id = `desc-${u.d.id}`;
+    return s;
+  }));
+  estado.indice = indiceDeTexto(cuerpo);
+  if (anclasNuevas && reg) persistir(reg);
+  if (estado.marcaElegida) {
+    if (ubicadas.some((u) => u.d.id === estado.marcaElegida)) pintarElegida();
+    else estado.marcaElegida = null;
+  }
+  ubicarApuntes();
+}
+function marcaPorId(id) {
+  return estado.biblioteca.get(estado.notaAbierta)?.destacados.find((d) => d.id === id) || null;
+}
+function anunciar(texto) { aviso.textContent = ""; requestAnimationFrame(() => { aviso.textContent = texto; }); }
+
+/* --- la propuesta: la frase tocada, en gris, todavía sin guardar --- */
+let propuesta = null;      // { inicio, fin } en el texto normalizado
+let seleccionGuardada = null;
+function mostrarPropuesta(inicio, fin) {
+  quitarPropuesta();
+  propuesta = { inicio, fin };
+  const r = rangoDom(estado.indice, inicio, fin);
+  if (!r) return;
+  if (window.CSS?.highlights && window.Highlight) {
+    CSS.highlights.set("propuesta", new Highlight(r));
+  } else {
+    envolver(estado.indice, inicio, fin, () => el("mark", "propuesta"));
+    estado.indice = indiceDeTexto(lector.querySelector(".cuerpo"));
+  }
+}
+function quitarPropuesta() {
+  propuesta = null;
+  if (window.CSS?.highlights) CSS.highlights.delete("propuesta");
+  const cuerpo = lector.querySelector(".cuerpo");
+  const viejas = cuerpo ? cuerpo.querySelectorAll("mark.propuesta") : [];
+  if (viejas.length) {
+    for (const m of viejas) m.replaceWith(...m.childNodes);
+    cuerpo.normalize();
+    estado.indice = indiceDeTexto(cuerpo);
+  }
+}
+// La frase bajo el dedo: del punto anterior al siguiente, dentro del mismo párrafo.
 const ABREVIATURAS = /(?:\b(?:Sr|Sra|Dr|Dra|Lic|Ing|Gral|Cnel|Av|etc)|[A-ZÁÉÍÓÚÑ])$/;
-function fraseEn(x, y, cuerpo) {
+function fraseEn(indice, p) {
+  const { normal, bloqueDe } = indice;
+  if (p == null) return null;
+  if (p >= normal.length) p = normal.length - 1;
+  if (p < 0) return null;
+  if (bloqueDe[p] === -1) p = Math.max(0, p - 1);
+  const b = bloqueDe[p];
+  let ini = p, fin = p;
+  while (ini > 0 && bloqueDe[ini - 1] === b) ini--;
+  while (fin < normal.length && bloqueDe[fin] === b) fin++;
+  const texto = normal.slice(ini, fin);
+  const pos = p - ini;
+  const cortes = /[.!?…]["”»’)]*(?=\s|$)/g;
+  let desde = 0, hasta = texto.length, m;
+  while ((m = cortes.exec(texto))) {
+    if (m[0][0] === "." && ABREVIATURAS.test(texto.slice(0, m.index))) continue;  // EE.UU., Sr.
+    const corte = m.index + m[0].length;
+    if (corte <= pos) desde = corte;
+    else { hasta = corte; break; }
+  }
+  while (desde < hasta && texto[desde] === " ") desde++;
+  while (hasta > desde && texto[hasta - 1] === " ") hasta--;
+  return hasta - desde >= 3 ? { inicio: ini + desde, fin: ini + hasta } : null;
+}
+function posicionDelToque(x, y) {
   let nodo, offset;
   if (document.caretRangeFromPoint) {
     const r = document.caretRangeFromPoint(x, y);
@@ -1063,97 +1397,561 @@ function fraseEn(x, y, cuerpo) {
     if (!c) return null;
     [nodo, offset] = [c.offsetNode, c.offset];
   } else return null;
-  if (nodo.nodeType !== Node.TEXT_NODE || !cuerpo.contains(nodo)) return null;
-  const bloque = nodo.parentElement.closest("p, li, blockquote, h2, h3, h4, figcaption, td");
-  if (!bloque || !cuerpo.contains(bloque)) return null;
-  let texto = "", pos = -1;
-  const w = document.createTreeWalker(bloque, NodeFilter.SHOW_TEXT);
-  while (w.nextNode()) {
-    if (w.currentNode === nodo) pos = texto.length + offset;
-    texto += w.currentNode.data;
-  }
-  if (pos < 0) return null;
-  const cortes = /[.!?…]["”»’)]*(?=\s|$)/g;
-  let desde = 0, hasta = texto.length, m;
-  while ((m = cortes.exec(texto))) {
-    if (m[0][0] === "." && ABREVIATURAS.test(texto.slice(0, m.index))) continue;  // EE.UU., Sr.
-    const corte = m.index + m[0].length;
-    if (corte <= pos) desde = corte;
-    else { hasta = corte; break; }
-  }
-  const frase = texto.slice(desde, hasta).replace(/\s+/g, " ").trim();
-  return frase.length >= 3 ? { frase, bloque } : null;
+  if (nodo.nodeType !== Node.TEXT_NODE || !estado.indice?.desdeNodo.has(nodo)) return null;
+  return posicionDe(estado.indice, nodo, offset);
+}
+// Lo elegido se redondea a palabras enteras.
+function aPalabras(normal, a, b) {
+  const letra = /[\p{L}\p{N}]/u;
+  while (a > 0 && letra.test(normal[a - 1]) && letra.test(normal[a])) a--;
+  while (b < normal.length && b > 0 && letra.test(normal[b]) && letra.test(normal[b - 1])) b++;
+  // Ni empieza con lo que cierra (", la serie") ni termina en lo que abre o en una coma.
+  while (a < b && /[\s,.;:)\]»”’]/u.test(normal[a])) a++;
+  while (b > a && /[\s,;:(\[«“‘]/u.test(normal[b - 1])) b--;
+  return [a, b];
 }
 
-async function agregarMarca(raiz, texto) {
+/* --- crear, recolorear y borrar --- */
+// Crea (o fusiona) la marca en memoria y la pinta. Sincrónica: el que llama guarda después.
+function crearMarca(inicio, fin, color) {
   const reg = registroDe(estado.notaAbierta);
-  if (reg.destacados.some((d) => d.texto === texto) || !marcarTexto(raiz, texto)) return;
-  reg.destacados.push({ texto, creado: new Date().toISOString() });
-  await persistir(reg);
-  avisar(reg.destacados.length === 1 ? "Marcado. Está en Anotaciones" : "Marcado");
+  const indice = estado.indice;
+  [inicio, fin] = aPalabras(indice.normal, inicio, fin);
+  if (fin - inicio < 2) return null;
+  const ubicadas = estado.ubicadas || [];
+  const contenedora = ubicadas.find((u) => u.inicio <= inicio && fin <= u.fin);
+  if (contenedora) return { marca: contenedora.d, reg, nueva: false };
+  const pisadas = ubicadas.filter((u) => u.inicio < fin && inicio < u.fin);
+  let a = inicio, b = fin;
+  for (const u of pisadas) { a = Math.min(a, u.inicio); b = Math.max(b, u.fin); }
+  const ahora = new Date().toISOString();
+  let marca;
+  if (pisadas.length) {
+    // Marcar encima de otras marcas las une en una sola: la más vieja conserva su id, los apuntes se juntan enteros.
+    const vieja = [...pisadas].sort((x, y) => x.d.creado.localeCompare(y.d.creado))[0].d;
+    const apuntes = [...pisadas].sort((x, y) => x.inicio - y.inicio).map((u) => u.d.apunte).filter(Boolean);
+    marca = { ...vieja, texto: indice.normal.slice(a, b), color, apunte: apuntes.join("\n\n"), editado: ahora, ancla: anclaDe(indice, a, b) };
+    reg.destacados = reg.destacados.filter((d) => !pisadas.some((u) => u.d.id === d.id));
+  } else {
+    marca = { id: idNuevoDeMarca(), texto: indice.normal.slice(a, b), color, apunte: "", creado: ahora, editado: null, ancla: anclaDe(indice, a, b) };
+  }
+  reg.destacados.push(marca);
+  // Si marcaste sobre la versión de la edición, la copia guardada pasa a ser esa (la que marcaste).
+  if (estado.versionPintada === "edicion" && !estado.marcasPerdidas?.size && estado.notas.has(reg.id)) reg.nota = estado.notas.get(reg.id);
+  estado.biblioteca.set(reg.id, reg);
+  anularDeshacer();
+  getSelection().removeAllRanges();
+  seleccionGuardada = null;
+  repintarMarcas();
+  return { marca, reg, nueva: true };
 }
-async function borrarMarca(texto) {
-  const reg = registroDe(estado.notaAbierta);
-  reg.destacados = reg.destacados.filter((d) => d.texto !== texto);
-  desmarcar(lector.querySelector(".cuerpo"), texto);
+async function marcar(inicio, fin, color) {
+  const hecho = crearMarca(inicio, fin, color);
+  if (!hecho) return null;
+  if (!hecho.nueva) { elegirMarca(hecho.marca.id); return hecho.marca; }
+  guardarMemoria("ultimo-color", color);
+  await persistir(hecho.reg);
+  pedirPersistencia();
+  if (!leerMemoria("ya-marco", false)) {
+    guardarMemoria("ya-marco", true);
+    avisar("Marcado. Lo encontrás en Anotaciones.");
+  }
+  anunciar(`Marcado en ${color}`);
+  return hecho.marca;
+}
+async function recolorear(id, color) {
+  const reg = estado.biblioteca.get(estado.notaAbierta);
+  const d = marcaPorId(id);
+  if (!reg || !d || d.color === color) return;
+  anularDeshacer();
+  d.color = color;
+  d.editado = new Date().toISOString();
+  for (const m of lector.querySelectorAll(`mark[data-id="${id}"], aside.apunte[data-id="${id}"]`)) m.dataset.color = color;
+  guardarMemoria("ultimo-color", color);
   await persistir(reg);
-  avisar("Desmarcado");
+  pintarMarcador();
+  anunciar(`Color: ${color}`);
+}
+// Deshacer: una copia de los registros tocados; volver a guardarlos tal cual.
+const instantanea = (regs) => regs.filter(Boolean).map((r) => structuredClone(r));
+async function restaurar(copias) {
+  for (const c of copias) await persistir(c);
+  if (estado.notaAbierta && copias.some((c) => c.id === estado.notaAbierta)) repintarMarcas();
+  if (!panel.hidden) dibujarPanel();
+  pintarBotonesLector();
+}
+async function borrarMarcaId(id) {
+  const reg = estado.biblioteca.get(estado.notaAbierta);
+  const d = marcaPorId(id);
+  if (!reg || !d) return;
+  const copias = instantanea([reg]);
+  reg.destacados = reg.destacados.filter((x) => x.id !== id);
+  await persistir(reg);
+  cerrarMarcador();
+  repintarMarcas();
+  avisar(d.apunte ? "Borraste la marca y su apunte" : "Borraste la marca", () => restaurar(copias), { duracion: d.apunte ? 10000 : 6000 });
+  anunciar("Borraste la marca");
 }
 
-let marcando = false;
-function ponerMarcador(si) {
-  marcando = si;
-  const b = lector.querySelector(".marcar");
-  b.setAttribute("aria-pressed", String(si));
-  b.setAttribute("aria-label", si ? "Dejar de marcar" : "Marcar frases");
-  b.classList.toggle("activo", si);
-  lector.classList.toggle("marcando", si);
-  tiraMarcar.hidden = !si;
+/* --- la tira del marcador --- */
+let marcadorEstado = null;        // "nueva" | "marca" | "pista"
+let scrollAlAbrir = 0, scrollPropio = false;
+function pintarElegida() {
+  for (const m of lector.querySelectorAll("mark.elegida, aside.apunte.elegido")) m.classList.remove("elegida", "elegido");
+  if (!estado.marcaElegida) return;
+  for (const m of lector.querySelectorAll(`mark[data-id="${estado.marcaElegida}"]`)) m.classList.add("elegida");
+  lector.querySelector(`aside.apunte[data-id="${estado.marcaElegida}"]`)?.classList.add("elegido");
 }
-lector.querySelector(".marcar").addEventListener("click", () => ponerMarcador(!marcando));
-tiraMarcar.querySelector("button").addEventListener("click", () => ponerMarcador(false));
-// Con el lápiz, tocar una frase la marca y tocar una marca la desmarca (los enlaces no se abren).
+function pintarMarcador() {
+  const d = marcadorEstado === "marca" ? marcaPorId(estado.marcaElegida) : null;
+  const ultimo = leerMemoria("ultimo-color", "amarillo");
+  for (const b of marcador.querySelectorAll(".muestra")) {
+    const c = b.dataset.color;
+    if (marcadorEstado === "marca") {
+      b.setAttribute("aria-pressed", String(d?.color === c));
+      b.setAttribute("aria-label", `Color ${c}`);
+    } else {
+      b.removeAttribute("aria-pressed");
+      b.setAttribute("aria-label", `Marcar en ${c}`);
+    }
+    b.classList.toggle("ultimo", marcadorEstado === "nueva" && c === ultimo);
+  }
+  const escribir = marcador.querySelector(".escribir");
+  escribir.setAttribute("aria-label", d?.apunte ? "Editar el apunte" : "Escribir un apunte");
+  marcador.querySelector(".cerrar").setAttribute("aria-label", marcadorEstado === "marca" ? "Listo" : "Cancelar");
+}
+let esperaOcultarMarcador = 0;
+function abrirMarcador(estadoTira) {
+  marcadorEstado = estadoTira;
+  marcador.dataset.estado = estadoTira;
+  pintarMarcador();
+  clearTimeout(esperaOcultarMarcador);
+  marcador.hidden = false;
+  requestAnimationFrame(() => marcador.classList.add("visible"));
+  const alto = estado.modo === "tableta" ? 72 : 60;
+  lector.style.setProperty("--alto-marcador", `calc(${alto}px + var(--seguro-abajo))`);
+  lector.classList.add("con-marcador");
+  document.documentElement.style.setProperty("--alto-pie", `${marcador.getBoundingClientRect().height || alto}px`);
+  scrollAlAbrir = lector.scrollTop;
+  // Que lo propuesto o la marca elegida no quede detrás de la tira.
+  requestAnimationFrame(() => {
+    const elegido = propuesta || seleccionGuardada;
+    const objetivo = marcadorEstado === "marca"
+      ? lector.querySelector(`mark[data-id="${estado.marcaElegida}"].fin`)
+      : elegido && rangoDom(estado.indice, elegido.inicio, elegido.fin);
+    const caja = objetivo?.getBoundingClientRect?.();
+    // Dónde termina quedando la tira (sin la transición de entrada): alto de la pantalla menos su "bottom" y su alto.
+    const tope = document.documentElement.clientHeight - parseFloat(getComputedStyle(marcador).bottom || "0") - marcador.offsetHeight;
+    const aire = marcadorEstado === "nueva" && !propuesta && seleccionGuardada ? 72 : 16;   // lejos del menú nativo
+    if (caja && caja.bottom > tope - aire) {
+      scrollPropio = true;
+      lector.scrollTop += caja.bottom - tope + aire;
+      scrollAlAbrir = lector.scrollTop;
+      setTimeout(() => { scrollPropio = false; }, 80);
+    }
+  });
+}
+function cerrarMarcador() {
+  if (marcador.hidden && !propuesta && !estado.marcaElegida) return;
+  quitarPropuesta();
+  marcadorEstado = null;
+  estado.marcaElegida = null;
+  pintarElegida();
+  marcador.classList.remove("visible");
+  lector.classList.remove("con-marcador");
+  document.documentElement.style.removeProperty("--alto-pie");
+  const ocultar = () => { if (!marcador.classList.contains("visible")) marcador.hidden = true; };
+  clearTimeout(esperaOcultarMarcador);
+  if (reducido.matches) ocultar(); else esperaOcultarMarcador = setTimeout(ocultar, 170);
+}
+function elegirMarca(id, { conTira = true } = {}) {
+  quitarPropuesta();
+  estado.marcaElegida = id;
+  pintarElegida();
+  if (conTira) abrirMarcador("marca");
+}
+marcador.addEventListener("pointerdown", (ev) => ev.preventDefault());   // que no se pierda la selección nativa
+marcador.addEventListener("click", async (ev) => {
+  const b = ev.target.closest("button");
+  if (!b) return;
+  if (b.classList.contains("entendido")) { guardarMemoria("pista-marcar", true); cerrarMarcador(); return; }
+  if (b.classList.contains("cerrar")) { const id = estado.marcaElegida; cerrarMarcador(); if (id) lector.querySelector(`mark[data-id="${id}"].ini`)?.focus({ preventScroll: true }); return; }
+  if (b.classList.contains("tacho")) { if (estado.marcaElegida) borrarMarcaId(estado.marcaElegida); return; }
+  const objetivo = propuesta || seleccionGuardada;
+  if (b.classList.contains("muestra")) {
+    if (marcadorEstado === "marca") recolorear(estado.marcaElegida, b.dataset.color);
+    else if (objetivo) {
+      const m = await marcar(objetivo.inicio, objetivo.fin, b.dataset.color);
+      if (m) elegirMarca(m.id);
+    }
+    return;
+  }
+  if (b.classList.contains("escribir")) {
+    if (marcadorEstado === "marca") { abrirApunte(estado.marcaElegida); return; }
+    if (!objetivo) return;
+    // Marca con el último color y abre el apunte en el mismo toque (si no, el iPhone no saca el teclado).
+    const hecho = crearMarca(objetivo.inicio, objetivo.fin, leerMemoria("ultimo-color", "amarillo"));
+    if (!hecho) return;
+    elegirMarca(hecho.marca.id, { conTira: false });
+    abrirApunte(hecho.marca.id);
+    if (hecho.nueva) { persistir(hecho.reg); pedirPersistencia(); }
+  }
+});
+
+// Tocar en el cuerpo: una frase la propone, una marca la elige, un enlace se abre, un apunte se edita.
 lector.addEventListener("click", (ev) => {
   const cuerpo = lector.querySelector(".cuerpo");
-  if (!marcando || !cuerpo?.contains(ev.target) || !getSelection().isCollapsed) return;
-  ev.preventDefault();
-  ev.stopPropagation();
-  const mark = ev.target.closest("mark");
-  if (mark) { borrarMarca(mark.dataset.texto); return; }
-  const f = fraseEn(ev.clientX, ev.clientY, cuerpo);
-  if (f) agregarMarca(f.bloque, f.frase);
-}, true);
-
-// Sin el lápiz: elegís un pedazo y aparece «Marcar»; tocás una marca y aparece «Desmarcar».
-let destacarModo = null;  // { tipo: "nuevo", texto } | { tipo: "quitar", texto }
-function pintarDestacar(modo) {
-  destacarModo = modo;
-  botonDestacar.hidden = !modo;
-  if (modo) botonDestacar.querySelector("span").textContent = modo.tipo === "nuevo" ? "Marcar" : "Desmarcar";
-}
+  if (!cuerpo || ev.target.closest("#marcador")) return;
+  const apunte = ev.target.closest("aside.apunte");
+  if (apunte) {
+    if (!apunte.classList.contains("editando")) {
+      if (lector.querySelector("aside.apunte.editando")) cerrarEdicionAlMargen();
+      elegirMarca(apunte.dataset.id, { conTira: false });
+      abrirApunte(apunte.dataset.id);
+    }
+    return;
+  }
+  if (lector.querySelector("aside.apunte.editando") && !ev.target.closest("aside.apunte")) { cerrarEdicionAlMargen(); return; }
+  if (!cuerpo.contains(ev.target)) { if (!ev.target.closest(".barra")) cerrarMarcador(); return; }
+  if (ev.target.closest("a")) { cerrarMarcador(); return; }
+  if (!getSelection().isCollapsed) return;
+  const mark = ev.target.closest("mark[data-id]");
+  if (mark) { elegirMarca(mark.dataset.id); return; }
+  if (!marcador.hidden && marcadorEstado !== "pista") { cerrarMarcador(); return; }   // con la tira abierta, un toque sólo la cierra
+  if (marcadorEstado === "pista") guardarMemoria("pista-marcar", true);
+  const pos = posicionDelToque(ev.clientX, ev.clientY);
+  const f = pos == null ? null : fraseEn(estado.indice, pos);
+  if (!f) { cerrarMarcador(); return; }
+  mostrarPropuesta(f.inicio, f.fin);
+  abrirMarcador("nueva");
+});
+// Mantener apretado y ajustar las manijas: cuando la selección se queda quieta, la tira apunta a lo elegido.
+let esperaSeleccion = 0;
 document.addEventListener("selectionchange", () => {
   if (!lector.classList.contains("abierto")) return;
-  const sel = getSelection();
+  clearTimeout(esperaSeleccion);
+  esperaSeleccion = setTimeout(() => {
+    const sel = getSelection();
+    const cuerpo = lector.querySelector(".cuerpo");
+    if (!cuerpo || !sel.rangeCount || sel.isCollapsed) return;
+    if (document.activeElement?.matches?.("input, textarea")) return;
+    const r = sel.getRangeAt(0);
+    if (!cuerpo.contains(r.commonAncestorContainer) || sel.toString().trim().length < 3) return;
+    const a = posicionDe(estado.indice, r.startContainer, r.startOffset);
+    const z = posicionDe(estado.indice, r.endContainer, r.endOffset);
+    if (a == null || z == null || z - a < 3) return;
+    const dentro = (estado.ubicadas || []).find((u) => u.inicio <= a && z <= u.fin);
+    if (dentro) { elegirMarca(dentro.d.id); return; }
+    quitarPropuesta();
+    seleccionGuardada = { inicio: a, fin: z };
+    estado.marcaElegida = null;
+    pintarElegida();
+    abrirMarcador("nueva");
+  }, 120);
+});
+// Desplazarse con la tira abierta la cierra (lo propuesto sin color no se guarda).
+lector.addEventListener("scroll", () => {
+  if (marcador.hidden || scrollPropio || marcadorEstado === "pista") return;
+  if (Math.abs(lector.scrollTop - scrollAlAbrir) > 48 && getSelection().isCollapsed) cerrarMarcador();
+}, { passive: true });
+// Con teclado: Enter sobre una marca la elige; en la tira, 1-4 color, E escribir, Borrar la borra.
+lector.addEventListener("keydown", (ev) => {
+  const mark = ev.target.closest?.("mark[data-id]");
+  if (mark && (ev.key === "Enter" || ev.key === " ")) {
+    ev.preventDefault();
+    elegirMarca(mark.dataset.id);
+    (marcador.querySelector('.muestra[aria-pressed="true"]') || marcador.querySelector(".muestra")).focus();
+  }
+});
+function teclaDelMarcador(ev) {
+  if (marcador.hidden || ev.target.matches?.("input, textarea")) return false;
+  const n = "1234".indexOf(ev.key);
+  if (n >= 0) { marcador.querySelectorAll(".muestra")[n].click(); return true; }
+  if (ev.key === "e" || ev.key === "E") { marcador.querySelector(".escribir").click(); return true; }
+  if ((ev.key === "Backspace" || ev.key === "Delete") && marcadorEstado === "marca") { borrarMarcaId(estado.marcaElegida); return true; }
+  if (ev.key === "Escape") { marcador.querySelector(".cerrar").click(); return true; }
+  return false;
+}
+let temporizadorPista = 0;
+function mostrarPistaSiHaceFalta() {
+  if (leerMemoria("pista-marcar", false) || !lector.classList.contains("abierto") || !marcador.hidden || apunteAbierto) return;
+  if (!lector.querySelector(".cuerpo")?.textContent.trim()) return;
+  abrirMarcador("pista");
+}
+
+/* --- apuntes al lado: al margen en el iPad, debajo del párrafo en el teléfono --- */
+let modoApunte = "linea";
+let observadorCuerpo = null;
+function modoDeApuntes() {
+  if (estado.modo !== "tableta") return "linea";
+  const L = lector.clientWidth;
+  if ((L - 680) / 2 - 28 - 16 >= 180) return "colgado";
+  const reg = estado.biblioteca.get(estado.notaAbierta);
+  const hay = (reg?.destacados || []).some((d) => d.apunte) || Boolean(apunteAbierto);
+  return L >= 740 && hay ? "corrido" : "linea";
+}
+function asideDeApunte(d) {
+  const a = el("aside", "apunte");
+  a.dataset.id = d.id;
+  a.dataset.color = d.color;
+  a.setAttribute("role", "button");
+  a.tabIndex = 0;
+  a.setAttribute("aria-label", `Tu apunte: ${d.apunte.split(/\s+/).slice(0, 12).join(" ")}`);
+  a.append(el("span", "texto-apunte", d.apunte));
+  a.addEventListener("keydown", (ev) => { if ((ev.key === "Enter" || ev.key === " ") && !a.classList.contains("editando")) { ev.preventDefault(); a.click(); } });
+  return a;
+}
+const ordenEnTexto = (id) => (estado.ubicadas || []).findIndex((u) => u.d.id === id);
+function ubicarApuntes() {
+  const art = lector.querySelector("article");
   const cuerpo = lector.querySelector(".cuerpo");
-  const texto = sel && !sel.isCollapsed ? sel.toString().replace(/\s+/g, " ").trim() : "";
-  const adentro = cuerpo && sel.rangeCount && cuerpo.contains(sel.getRangeAt(0).commonAncestorContainer);
-  if (texto.length >= 3 && adentro) pintarDestacar({ tipo: "nuevo", texto });
-  else if (destacarModo?.tipo === "nuevo") pintarDestacar(null);
+  if (!art || !cuerpo) return;
+  if (lector.querySelector("aside.apunte.editando")) return;   // mientras escribís al margen no se rearma nada
+  // Al cambiar de modo (la columna se corre), la marca de referencia queda en el mismo lugar de la pantalla.
+  const ref = lector.querySelector("mark.elegida") || (apunteAbierto && lector.querySelector(`mark[data-id="${apunteAbierto.id}"]`));
+  const antes = ref?.getBoundingClientRect().top;
+  for (const a of lector.querySelectorAll("aside.apunte, .margen")) a.remove();
+  modoApunte = modoDeApuntes();
+  art.classList.toggle("colgado", modoApunte === "colgado");
+  lector.classList.toggle("corrido", modoApunte === "corrido");
+  const conApunte = (estado.ubicadas || []).filter((u) => u.d.apunte);
+  if (modoApunte === "linea") {
+    for (const u of conApunte) {
+      const ult = [...cuerpo.querySelectorAll(`mark[data-id="${u.d.id}"]`)].at(-1);
+      if (!ult) continue;
+      const a = asideDeApunte(u.d);
+      const tabla = ult.closest("table"), figura = ult.closest("figure"), li = ult.closest("li");
+      if (li) li.append(a);
+      else {
+        let ancla = tabla || figura || ult.closest("p, blockquote, h2, h3, h4") || ult;
+        while (ancla.nextElementSibling?.matches("aside.apunte")) ancla = ancla.nextElementSibling;
+        ancla.after(a);
+      }
+    }
+  } else {
+    const margen = el("div", "margen");
+    margen.setAttribute("aria-label", "Tus apuntes");
+    art.append(margen);
+    for (const u of conApunte) margen.append(asideDeApunte(u.d));
+    acomodarMargen();
+  }
+  if (ref && antes != null) lector.scrollTop += ref.getBoundingClientRect().top - antes;
+  pintarElegida();
+}
+// En el margen, cada apunte arranca a la altura del primer renglón de su marca y nunca pisa al de arriba.
+function acomodarMargen() {
+  const art = lector.querySelector("article");
+  const margen = art?.querySelector(".margen");
+  if (!margen) return;
+  const base = art.getBoundingClientRect().top;
+  let piso = -Infinity;
+  for (const a of margen.querySelectorAll("aside.apunte")) {
+    const ini = lector.querySelector(`mark[data-id="${a.dataset.id}"].ini`);
+    const rect = ini?.getClientRects()[0];
+    if (!rect) { a.hidden = true; continue; }
+    a.hidden = false;
+    const top = Math.max(rect.top - base, piso);
+    a.style.top = `${top}px`;
+    piso = top + a.offsetHeight + 12;
+  }
+}
+let esperaAcomodo = 0;
+function reacomodarApuntes() {
+  cancelAnimationFrame(esperaAcomodo);
+  esperaAcomodo = requestAnimationFrame(() => {
+    if (!lector.classList.contains("abierto")) return;
+    if (apunteAbierto && !hojaApunte.hidden) return;   // la hoja a pantalla completa no depende del ancho
+    if (modoDeApuntes() !== modoApunte) {
+      // Al girar o pasar a Split View: lo que estás escribiendo al margen se guarda y se rearma en el modo nuevo.
+      if (lector.querySelector("aside.apunte.editando")) cerrarEdicionAlMargen();
+      else ubicarApuntes();
+    } else acomodarMargen();
+  });
+}
+addEventListener("resize", reacomodarApuntes);
+document.fonts?.ready.then(reacomodarApuntes);
+
+/* --- escribir el apunte --- */
+let esperaGuardado = 0;
+let apunteAbierto = null;   // { id }
+let abridorApunte = null;
+let inertesApunte = [];
+const LIMITE_APUNTE = 1000;
+function cajaDelApunte() {
+  if (!apunteAbierto) return null;
+  return !hojaApunte.hidden ? hojaApunte.querySelector("textarea")
+    : lector.querySelector(`aside.apunte.editando[data-id="${apunteAbierto.id}"] textarea`);
+}
+function guardarApunteYa() {
+  clearTimeout(esperaGuardado);
+  const caja = cajaDelApunte();
+  if (!caja) return;
+  const reg = estado.biblioteca.get(estado.notaAbierta);
+  const d = marcaPorId(apunteAbierto.id);
+  if (!reg || !d) return;
+  // Un apunte que viene de fusionar puede pasar los 1000: nunca se recorta lo que ya estaba.
+  const texto = caja.value.slice(0, Math.max(LIMITE_APUNTE, d.apunte.length)).replace(/\s+$/, "");
+  if (texto === d.apunte) return;
+  anularDeshacer();
+  d.apunte = texto;
+  d.editado = new Date().toISOString();
+  persistir(reg);
+}
+function contarQuedan(caja, salida) {
+  const quedan = caja.maxLength - caja.value.length;
+  salida.textContent = quedan <= 100 ? `Quedan ${Math.max(0, quedan)}` : "";
+}
+function abrirApunte(id, provisoria = null) {
+  const d = provisoria || marcaPorId(id);
+  if (!d) return;
+  if (apunteAbierto && apunteAbierto.id !== id) { if (!hojaApunte.hidden) cerrarApunte(); else cerrarEdicionAlMargen(); }
+  abridorApunte = document.activeElement;
+  apunteAbierto = { id };
+  clearTimeout(temporizadorPista);
+  marcador.hidden = true;
+  marcador.classList.remove("visible");
+  lector.classList.remove("con-marcador");
+  if (modoDeApuntes() === "linea") {
+    modoApunte = "linea";
+    const caja = hojaApunte.querySelector("textarea");
+    const frase = hojaApunte.querySelector(".frase");
+    frase.textContent = d.texto;
+    frase.dataset.color = d.color;
+    hojaApunte.querySelector(".borrar-apunte").hidden = !d.apunte;
+    caja.maxLength = Math.max(LIMITE_APUNTE, d.apunte.length);
+    caja.value = d.apunte;
+    contarQuedan(caja, hojaApunte.querySelector(".quedan"));
+    hojaApunte.hidden = false;
+    caja.focus();   // en el mismo toque: así el iPhone saca el teclado
+    requestAnimationFrame(() => hojaApunte.classList.add("abierta"));
+    // La hoja atrapa el foco: todo lo de atrás queda inerte mientras escribís.
+    inertesApunte = [...document.body.children].filter((n) => n !== hojaApunte && !n.inert);
+    for (const n of inertesApunte) n.inert = true;
+  } else {
+    editarAlMargen(d);
+  }
+}
+function soltarInertesApunte() {
+  for (const n of inertesApunte) n.inert = false;
+  inertesApunte = [];
+  // El lector sigue tapando lo de abajo como siempre.
+  if (lector.classList.contains("abierto")) for (const n of [libro, recorrido, indiceBoton, chipFiltro, panel]) n.inert = true;
+}
+function cerrarApunte() {
+  guardarApunteYa();
+  const id = apunteAbierto?.id;
+  apunteAbierto = null;
+  hojaApunte.classList.remove("abierta");
+  hojaApunte.hidden = true;
+  soltarInertesApunte();
+  repintarMarcas();
+  if (id) { estado.marcaElegida = id; pintarElegida(); }
+  const volver = id && lector.querySelector(`mark[data-id="${id}"].ini`);
+  (volver || abridorApunte)?.focus?.({ preventScroll: true });
+}
+hojaApunte.querySelector(".listo").addEventListener("click", cerrarApunte);
+hojaApunte.querySelector("textarea").addEventListener("input", (ev) => {
+  contarQuedan(ev.target, hojaApunte.querySelector(".quedan"));
+  clearTimeout(esperaGuardado);
+  esperaGuardado = setTimeout(guardarApunteYa, 400);
 });
-lector.addEventListener("click", (ev) => {
-  const mark = ev.target.closest("mark");
-  if (mark && getSelection().isCollapsed) pintarDestacar({ tipo: "quitar", texto: mark.dataset.texto });
-  else if (destacarModo?.tipo === "quitar" && !ev.target.closest("#destacar")) pintarDestacar(null);
+hojaApunte.addEventListener("keydown", (ev) => {
+  if (ev.key === "Escape" || (ev.key === "Enter" && (ev.metaKey || ev.ctrlKey))) { ev.preventDefault(); ev.stopPropagation(); cerrarApunte(); }
 });
-botonDestacar.addEventListener("pointerdown", (ev) => ev.preventDefault());  // que no se pierda la selección
-botonDestacar.addEventListener("click", async () => {
-  const modo = destacarModo;
-  if (!modo) return;
-  pintarDestacar(null);
-  if (modo.tipo === "nuevo") {
-    await agregarMarca(lector.querySelector(".cuerpo"), modo.texto);
-    getSelection().removeAllRanges();
-  } else await borrarMarca(modo.texto);
+async function borrarApunte(id) {
+  const reg = estado.biblioteca.get(estado.notaAbierta);
+  const d = marcaPorId(id);
+  if (!reg || !d) return;
+  const copias = instantanea([reg]);
+  d.apunte = "";
+  d.editado = new Date().toISOString();
+  await persistir(reg);
+  avisar("Borraste el apunte", () => restaurar(copias), { duracion: 10000 });
+}
+hojaApunte.querySelector(".borrar-apunte").addEventListener("click", async () => {
+  const id = apunteAbierto?.id;
+  clearTimeout(esperaGuardado);
+  hojaApunte.querySelector("textarea").value = "";
+  apunteAbierto = null;
+  hojaApunte.classList.remove("abierta");
+  hojaApunte.hidden = true;
+  soltarInertesApunte();
+  if (id) await borrarApunte(id);
+  repintarMarcas();
+  if (id) lector.querySelector(`mark[data-id="${id}"].ini`)?.focus({ preventScroll: true });
+});
+// En el iPad: el apunte se escribe ahí mismo, en el margen.
+function editarAlMargen(d) {
+  if (modoDeApuntes() !== modoApunte) ubicarApuntes();   // el primer apunte corre la columna (una sola vez, anclada)
+  const cuerpo = lector.querySelector(".cuerpo");
+  const ini = cuerpo.querySelector(`mark[data-id="${d.id}"].ini`);
+  if (ini) lector.scrollTop += ini.getBoundingClientRect().top - lector.clientHeight * 0.25;
+  let a = lector.querySelector(`aside.apunte[data-id="${d.id}"]`);
+  if (!a) {
+    let margen = lector.querySelector(".margen");
+    if (!margen) { margen = el("div", "margen"); lector.querySelector("article").append(margen); }
+    a = asideDeApunte(d);
+    // En el orden del texto: al lado de su marca, no al final del margen.
+    margen.insertBefore(a, [...margen.children].find((x) => ordenEnTexto(x.dataset.id) > ordenEnTexto(d.id)) || null);
+  }
+  a.classList.add("editando");
+  a.removeAttribute("role");
+  a.removeAttribute("aria-label");
+  a.replaceChildren();
+  const caja = el("textarea");
+  caja.maxLength = Math.max(LIMITE_APUNTE, d.apunte.length);
+  caja.value = d.apunte;
+  caja.placeholder = "Escribí lo que quieras al lado de esta frase.";
+  caja.setAttribute("aria-label", "Tu apunte");
+  const quedan = el("p", "quedan");
+  const acciones = el("div", "acciones-apunte");
+  const listo = el("button", "listo", "Listo");
+  listo.type = "button";
+  listo.addEventListener("click", (ev) => { ev.stopPropagation(); cerrarEdicionAlMargen(); });
+  acciones.append(listo);
+  if (d.apunte) {
+    const borrar = el("button", "borrar-apunte", "Borrar apunte");
+    borrar.type = "button";
+    borrar.addEventListener("click", async (ev) => {
+      ev.stopPropagation();
+      clearTimeout(esperaGuardado);
+      caja.value = "";
+      const id = d.id;
+      apunteAbierto = null;
+      a.classList.remove("editando");
+      await borrarApunte(id);
+      repintarMarcas();
+      lector.querySelector(`mark[data-id="${id}"].ini`)?.focus({ preventScroll: true });
+    });
+    acciones.append(borrar);
+  }
+  a.append(caja, quedan, acciones);
+  const crecer = () => { caja.style.height = "auto"; caja.style.height = `${Math.max(88, caja.scrollHeight)}px`; acomodarMargen(); };
+  caja.addEventListener("input", () => { crecer(); contarQuedan(caja, quedan); clearTimeout(esperaGuardado); esperaGuardado = setTimeout(guardarApunteYa, 400); });
+  // Esc (o ⌘↩) cierra sólo la tarjeta, esté el foco en el texto o en sus botones; nunca la nota entera.
+  a.addEventListener("keydown", (ev) => {
+    if (ev.key === "Escape" || (ev.key === "Enter" && (ev.metaKey || ev.ctrlKey))) { ev.preventDefault(); ev.stopPropagation(); cerrarEdicionAlMargen(); }
+  });
+  acomodarMargen();
+  caja.focus();
+  crecer();
+}
+function cerrarEdicionAlMargen() {
+  guardarApunteYa();
+  const a = lector.querySelector("aside.apunte.editando");
+  const id = a?.dataset.id || apunteAbierto?.id;
+  apunteAbierto = null;
+  for (const x of lector.querySelectorAll("aside.apunte.editando")) x.classList.remove("editando");
+  repintarMarcas();
+  if (id) {
+    estado.marcaElegida = id;
+    pintarElegida();
+    lector.querySelector(`mark[data-id="${id}"].ini`)?.focus({ preventScroll: true });
+  }
+}
+visualViewport?.addEventListener("resize", () => {
+  const caja = lector.querySelector("aside.apunte.editando textarea");
+  if (caja && document.activeElement === caja) caja.scrollIntoView({ block: "nearest" });
 });
 
 /* ---------- leer más tarde: sin aviso al teléfono, el recordatorio aparece al abrir el diario ---------- */
@@ -1167,29 +1965,37 @@ function opcionesDeTarde() {
   opciones.push(["Mañana a la mañana, 8 h", a(1, 8)]);
   return opciones;
 }
-function abrirHojita(id) {
-  notaParaTarde = id;
+let abridorTarde = null, cierreTarde = 0;
+function abrirHojita(idOIds) {
+  clearTimeout(cierreTarde);
+  abridorTarde = document.activeElement;
+  const ids = Array.isArray(idOIds) ? idOIds : [idOIds];
+  notaParaTarde = ids[0];
+  hojitaTarde.querySelector("h2").textContent = ids.length > 1 ? "¿Cuándo te las recuerdo?" : "¿Cuándo te la recuerdo?";
   const caja = hojitaTarde.querySelector(".opciones");
   caja.replaceChildren();
-  const reg = estado.biblioteca.get(id);
+  const reg = Array.isArray(idOIds) ? null : estado.biblioteca.get(ids[0]);
   for (const [texto, cuando] of opcionesDeTarde()) {
     const b = el("button", null, texto);
     b.type = "button";
     b.addEventListener("click", async () => {
-      const r = registroDe(id);
-      r.masTarde = cuando.toISOString();
-      r.avisado = false;
-      await persistir(r);
+      for (const id of ids) {
+        const r = estado.biblioteca.get(id) || registroDe(id);
+        r.masTarde = cuando.toISOString();
+        r.avisado = false;
+        await persistir(r);
+      }
       cerrarHojita();
       pintarBotonesLector();
-      avisar(`Te la recuerdo después de las ${horaFmt.format(cuando)}`);
+      if (!panel.hidden) { eligiendo = false; elegidas.clear(); dibujarPanel(); }
+      avisar(`Te ${ids.length > 1 ? "las" : "la"} recuerdo después de las ${horaFmt.format(cuando)}`);
     });
     caja.append(b);
   }
   if (reg?.masTarde) {
     const q = el("button", "quitar", "Ya no, sacarla de la lista");
     q.type = "button";
-    q.addEventListener("click", async () => { reg.masTarde = null; await persistir(reg); cerrarHojita(); pintarBotonesLector(); avisar("Sacada de para más tarde"); });
+    q.addEventListener("click", async () => { cerrarHojita(); await quitarDeMasTarde([reg.id]); pintarBotonesLector(); if (!panel.hidden) dibujarPanel(); });
     caja.append(q);
   }
   hojitaTarde.hidden = false;
@@ -1198,7 +2004,8 @@ function abrirHojita(id) {
 }
 function cerrarHojita() {
   hojitaTarde.classList.remove("abierta");
-  setTimeout(() => { hojitaTarde.hidden = true; }, 260);
+  cierreTarde = setTimeout(() => { hojitaTarde.hidden = true; }, 260);
+  if (abridorTarde?.isConnected) abridorTarde.focus({ preventScroll: true });
 }
 hojitaTarde.querySelector(".cancelar").addEventListener("click", cerrarHojita);
 hojitaTarde.addEventListener("click", (ev) => { if (ev.target === hojitaTarde) cerrarHojita(); });
@@ -1229,28 +2036,155 @@ botonRecordatorio.addEventListener("click", () => {
   else abrirPanel("tarde");
 });
 
-/* ---------- compartir: una o varias notas, por mail o para Claude ---------- */
-function bloqueDeNota(reg, completo) {
+/* ---------- avisos de último momento (Web Push) ---------- */
+// Clave pública VAPID: la privada es un secreto de GitHub; con ella la tarea de la edición firma los avisos.
+const VAPID_PUBLICA = "BEAuy97f12ImsIJ34T4Uh1GlZhJAUurCnv3ZhKLsBPU5CNA7MXR2tJV-Q9utYGsxcT7xj5gJIfnyddSM_F-EcHs";
+const hojitaAvisos = document.getElementById("avisos");
+const desdeBase64url = (s) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(s.length / 4) * 4, "=")), (c) => c.charCodeAt(0));
+const esIpad = () => /iPad/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const instalada = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+
+async function suscripcionActual() {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return null;
+  const reg = await navigator.serviceWorker.getRegistration();
+  return reg ? reg.pushManager.getSubscription() : null;
+}
+function mostrarCodigo(sub) {
+  const codigo = hojitaAvisos.querySelector(".codigo");
+  codigo.querySelector("textarea").value = JSON.stringify(sub.toJSON());
+  codigo.querySelector(".nombre-secreto").textContent = esIpad() ? "AVISOS_IPAD" : "AVISOS_IPHONE";
+  codigo.hidden = false;
+}
+async function pintarAvisos() {
+  const estadoTexto = hojitaAvisos.querySelector(".estado");
+  const opciones = hojitaAvisos.querySelector(".caja > .opciones");
+  opciones.replaceChildren();
+  hojitaAvisos.querySelector(".codigo").hidden = true;
+  const boton = (texto, accion, clase) => {
+    const b = el("button", clase || null, texto);
+    b.type = "button";
+    b.addEventListener("click", accion);
+    opciones.append(b);
+  };
+  if (!("Notification" in window) || !("PushManager" in window) || !instalada()) {
+    estadoTexto.textContent = "Para recibir avisos, abrí el diario desde su ícono en la pantalla de inicio: desde Safari no se puede.";
+    return;
+  }
+  if (Notification.permission === "denied") {
+    estadoTexto.textContent = "Los avisos están bloqueados para el diario. Activalos en Ajustes › Notificaciones › el pelado.";
+    return;
+  }
+  const sub = await suscripcionActual().catch(() => null);
+  if (sub) {
+    estadoTexto.textContent = "Activados en este equipo.";
+    boton("Ver el código para GitHub", () => mostrarCodigo(sub));
+    boton("Desactivar en este equipo", async () => { await sub.unsubscribe().catch(() => {}); avisar("Avisos desactivados en este equipo"); pintarAvisos(); }, "quitar");
+  } else {
+    estadoTexto.textContent = "";
+    boton("Activar avisos en este equipo", activarAvisos);
+  }
+}
+async function activarAvisos() {
+  const estadoTexto = hojitaAvisos.querySelector(".estado");
+  try {
+    if (await Notification.requestPermission() !== "granted") {
+      estadoTexto.textContent = "Sin permiso no te pueden llegar avisos. Podés darlo en Ajustes › Notificaciones › el pelado.";
+      return;
+    }
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: desdeBase64url(VAPID_PUBLICA) });
+    await pintarAvisos();
+    mostrarCodigo(sub);
+  } catch {
+    estadoTexto.textContent = "No se pudieron activar los avisos en este equipo. Probá de nuevo en un rato.";
+  }
+}
+function abrirAvisos() {
+  cerrarIndice();
+  hojitaAvisos.hidden = false;
+  requestAnimationFrame(() => hojitaAvisos.classList.add("abierta"));
+  pintarAvisos().then(() => (hojitaAvisos.querySelector(".caja > .opciones button") || hojitaAvisos.querySelector(".cancelar")).focus());
+}
+function cerrarAvisos() {
+  hojitaAvisos.classList.remove("abierta");
+  indiceBoton.focus({ preventScroll: true });
+  setTimeout(() => { hojitaAvisos.hidden = true; }, 260);
+}
+hojitaAvisos.querySelector(".cancelar").addEventListener("click", cerrarAvisos);
+hojitaAvisos.addEventListener("click", (ev) => { if (ev.target === hojitaAvisos) cerrarAvisos(); });
+hojitaAvisos.querySelector(".copiar").addEventListener("click", async () => {
+  const texto = hojitaAvisos.querySelector("textarea").value;
+  try { await navigator.clipboard.writeText(texto); avisar("Código copiado: pegalo en GitHub"); }
+  catch { hojitaAvisos.querySelector("textarea").select(); avisar("Seleccioná el código y copialo"); }
+});
+
+// Tocar un aviso con el diario abierto: si la nota es de una edición más nueva, se trae y se abre.
+async function abrirDesdeAviso(id) {
+  if (!estado.edicion || !id) return;
+  if (!notaPorId(id) && estado.clave) {
+    try {
+      const nueva = await abrirSobre(await traerSobre(), estado.clave);
+      if (nueva.generada !== estado.edicion.generada) {
+        montar(nueva);
+        estado.modo = "";
+        rearmar(true);
+        botonNueva.hidden = true;
+      }
+    } catch { /* sin señal: se abre lo que haya */ }
+  }
+  if (!notaPorId(id)) return;
+  if (!panel.hidden) cerrarPanel();
+  if (!indice.hidden) cerrarIndice();
+  abrirNota(id);
+}
+navigator.serviceWorker?.addEventListener("message", (ev) => { if (ev.data && "abrirNota" in ev.data) abrirDesdeAviso(ev.data.abrirNota); });
+
+/* ---------- marcas de una nota, en el orden del texto ---------- */
+function marcasEnOrden(reg, filtro = null) {
+  return [...(reg?.destacados || [])]
+    .filter((d) => !filtro || d.color === filtro)
+    .sort((a, b) => (a.ancla?.inicio ?? Infinity) - (b.ancla?.inicio ?? Infinity) || a.creado.localeCompare(b.creado));
+}
+// Las marcas que no aparecen ni en la nota de la edición ni en la copia guardada.
+function marcasPerdidasDe(reg) {
+  const fuentes = [...new Set([reg.nota?.cuerpo_html, estado.notas.get(reg.id)?.cuerpo_html].filter(Boolean))];
+  const indices = fuentes.map((html) => {
+    const raiz = document.createElement("div");
+    raiz.append(...limpiarCuerpo(html, null, reg.nota.url).childNodes);
+    return indiceDeTexto(raiz);
+  });
+  return new Set(reg.destacados.filter((d) => !indices.some((ix) => resolverMarca(ix, d))).map((d) => d.id));
+}
+function bajadaSinRepetir(n) {
+  const plano = (t) => (t || "").replace(/\s+/g, " ").trim().toLowerCase();
+  return n.bajada && !plano(textoPlano(n.cuerpo_html || "")).slice(0, 400).startsWith(plano(n.bajada).slice(0, 80)) ? n.bajada : "";
+}
+
+/* ---------- compartir: una o varias notas, por mail, por la hoja de iOS o para Claude ---------- */
+function bloqueDeNota(reg, completo, { filtro = null, conColor = false } = {}) {
   const n = reg.nota;
   const fecha = diaFmt.format(new Date(n.publicada || n.fecha || reg.guardada || Date.now()));
-  const destacados = reg.destacados.map((d) => `«${d.texto}»`);
-  if (!completo) {
-    return [n.titulo, `${reg.medio.nombre} · ${fecha}`, ...destacados, n.url].join("\n");
-  }
-  return [`# ${n.titulo}`, `${reg.medio.nombre} · ${fecha} · ${n.url}`, n.bajada || "", textoPlano(n.cuerpo_html),
-    destacados.length ? `Lo que marqué:\n${destacados.map((d) => `- ${d}`).join("\n")}` : ""].filter(Boolean).join("\n\n");
+  const marcas = marcasEnOrden(reg, filtro);
+  const lineas = marcas.map((d) => [`- «${d.texto}»${conColor ? ` [${d.color}]` : ""}`,
+    ...(d.apunte ? [`  Mi apunte: ${d.apunte.replace(/\n/g, "\n  ")}`] : [])].join("\n"));
+  const marcado = marcas.length ? `Lo que marqué:\n${lineas.join("\n")}` : "";
+  if (!completo) return [n.titulo, `${reg.medio.nombre} · ${fecha}`, marcado, n.url].filter(Boolean).join("\n");
+  return [`# ${n.titulo}`, `${reg.medio.nombre} · ${fecha} · ${n.url}`, bajadaSinRepetir(n), textoPlano(n.cuerpo_html || ""), marcado]
+    .filter(Boolean).join("\n\n");
 }
-async function compartir(ids, como) {
+async function compartir(ids, como, { filtro = null } = {}) {
   const regs = ids.map((id) => estado.biblioteca.get(id) || registroDe(id));
   const completo = como === "claude";
-  const texto = regs.map((r) => bloqueDeNota(r, completo)).join(completo ? "\n\n---\n\n" : "\n\n———\n\n");
+  const colores = new Set(regs.flatMap((r) => marcasEnOrden(r, filtro).map((d) => d.color)));
+  const opciones = { filtro, conColor: colores.size > 1 };
+  const texto = regs.map((r) => bloqueDeNota(r, completo, opciones)).join(completo ? "\n\n---\n\n" : "\n\n———\n\n");
   const asunto = regs.length === 1 ? regs[0].nota.titulo : `${regs.length} notas de el diario del pelado`;
   if (como === "mail") {
     location.href = `mailto:?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(texto)}`;
     return;
   }
   const datos = regs.length === 1 && !completo
-    ? { title: asunto, text: bloqueDeNota(regs[0], false).replace(`\n${regs[0].nota.url}`, ""), url: regs[0].nota.url }
+    ? { title: asunto, text: bloqueDeNota(regs[0], false, opciones).replace(`\n${regs[0].nota.url}`, ""), url: regs[0].nota.url }
     : { title: asunto, text: texto };
   try {
     if (navigator.share) { await navigator.share(datos); return; }
@@ -1263,113 +2197,520 @@ async function compartir(ids, como) {
     } catch { avisar("No se pudo compartir desde acá"); }
   }
 }
+const hojitaCompartir = document.getElementById("compartir");
+let compartirPendiente = null, abridorCompartir = null;
+let cierreCompartir = 0, inertesHojita = [];
+// Una hojita abierta deja inerte todo lo de atrás (panel, lector, portada): el foco no se escapa.
+function atraparFoco(hojita) {
+  inertesHojita = [...document.body.children].filter((n) => n !== hojita && n !== toast && !n.inert);
+  for (const n of inertesHojita) n.inert = true;
+}
+function soltarFoco() {
+  for (const n of inertesHojita) n.inert = false;
+  inertesHojita = [];
+}
+function abrirCompartir(ids, opciones = {}) {
+  clearTimeout(cierreCompartir);
+  compartirPendiente = { ids, opciones };
+  abridorCompartir = document.activeElement;
+  atraparFoco(hojitaCompartir);
+  hojitaCompartir.querySelector("h2").textContent = ids.length === 1 ? "Compartir la nota" : `Compartir ${ids.length} notas`;
+  hojitaCompartir.hidden = false;
+  requestAnimationFrame(() => hojitaCompartir.classList.add("abierta"));
+  hojitaCompartir.querySelector(".opciones button").focus();
+}
+function cerrarCompartir() {
+  hojitaCompartir.classList.remove("abierta");
+  soltarFoco();
+  cierreCompartir = setTimeout(() => { hojitaCompartir.hidden = true; }, 260);
+  abridorCompartir?.focus?.({ preventScroll: true });
+}
+for (const b of hojitaCompartir.querySelectorAll("[data-como]")) {
+  b.addEventListener("click", async () => {
+    const p = compartirPendiente;
+    cerrarCompartir();
+    if (p) await compartir(p.ids, b.dataset.como, p.opciones);
+  });
+}
+hojitaCompartir.querySelector(".cancelar").addEventListener("click", cerrarCompartir);
+hojitaCompartir.addEventListener("click", (ev) => { if (ev.target === hojitaCompartir) cerrarCompartir(); });
+
+/* ---------- exportar en PDF: se arma en el equipo (jsPDF vendorizado) y se entrega por la hoja de compartir ---------- */
+let cargaPdf = null;
+function cargarPdf() {
+  if (!cargaPdf) {
+    cargaPdf = new Promise((ok, mal) => {
+      if (window.diarioPdf) return ok();
+      const s = document.createElement("script");
+      s.src = "pdf.js";
+      s.onload = ok;
+      s.onerror = () => mal(new Error("No se pudo cargar el generador de PDF"));
+      document.head.append(s);
+    }).then(() => window.diarioPdf.cargar());
+    cargaPdf.catch(() => { cargaPdf = null; });
+  }
+  return cargaPdf;
+}
+const precalentarPdf = () => { cargarPdf().catch(() => {}); };
+// La nota en bloques con sus tramos (negrita, itálica, marca, enlace): lo que dibuja pdf.js en "Nota completa".
+function bloquesParaPdf(nota, marcas) {
+  const raiz = document.createElement("div");
+  raiz.append(...limpiarCuerpo(nota.cuerpo_html || "", nota.foto, nota.url).childNodes);
+  for (const x of raiz.querySelectorAll("img, picture, video, iframe, svg")) x.remove();
+  const indice = indiceDeTexto(raiz);
+  const ubicadas = [], perdidas = [];
+  for (const d of marcas) {
+    const r = resolverMarca(indice, d);
+    if (r) ubicadas.push({ d, ...r }); else perdidas.push(d);
+  }
+  for (const u of [...ubicadas].sort((a, b) => b.inicio - a.inicio)) {
+    envolver(indice, u.inicio, u.fin, () => { const m = document.createElement("mark"); m.dataset.color = u.d.color; m.dataset.id = u.d.id; return m; });
+  }
+  const TIPOS = "p, h2, h3, h4, blockquote, li, tr, figcaption";
+  const elementos = [...raiz.querySelectorAll(TIPOS)].filter((e) => !e.parentElement.closest("blockquote, li, tr, figcaption") || e.matches("li") && !e.parentElement.closest("blockquote, tr"));
+  const tramosDe = (elemento) => {
+    const tramos = [];
+    const w = document.createTreeWalker(elemento, NodeFilter.SHOW_TEXT);
+    while (w.nextNode()) {
+      const nodo = w.currentNode;
+      if (nodo.parentElement.closest("ul, ol") !== elemento.closest("ul, ol") && elemento.matches("li") && nodo.parentElement.closest("li") !== elemento) continue;
+      const t = nodo.data.replace(/\s+/g, " ");
+      if (!t) continue;
+      const p = nodo.parentElement;
+      const tramo = { t, negrita: Boolean(p.closest("strong, b")), italica: Boolean(p.closest("em, i")), marca: p.closest("mark[data-color]")?.dataset.color || null, href: p.closest("a")?.href || "" };
+      const ult = tramos.at(-1);
+      if (ult && ult.negrita === tramo.negrita && ult.italica === tramo.italica && ult.marca === tramo.marca && ult.href === tramo.href) ult.t += t;
+      else tramos.push(tramo);
+    }
+    if (tramos.length) { tramos[0].t = tramos[0].t.replace(/^ /, ""); tramos.at(-1).t = tramos.at(-1).t.replace(/ $/, ""); }
+    return tramos.filter((x) => x.t);
+  };
+  const apuntesDe = new Map();
+  for (const u of ubicadas.sort((a, b) => a.inicio - b.inicio)) {
+    if (!u.d.apunte) continue;
+    const ult = [...raiz.querySelectorAll(`mark[data-id="${u.d.id}"]`)].at(-1);
+    const bloque = ult && elementos.find((e) => e.contains(ult));
+    if (!bloque) { perdidas.push(u.d); continue; }
+    if (!apuntesDe.has(bloque)) apuntesDe.set(bloque, []);
+    apuntesDe.get(bloque).push({ texto: u.d.apunte, color: u.d.color });
+  }
+  const bloques = [];
+  for (const e of elementos) {
+    const apuntes = apuntesDe.get(e);
+    let b;
+    if (e.matches("tr")) b = { tipo: "fila", celdas: [...e.children].map((c) => c.textContent.replace(/\s+/g, " ").trim()).filter(Boolean) };
+    else if (e.matches("figcaption")) { if (!e.querySelector("mark")) continue; b = { tipo: "epigrafe", tramos: tramosDe(e) }; }
+    else if (e.matches("li")) {
+      const lista = e.parentElement;
+      const n = [...lista.children].filter((x) => x.matches("li")).indexOf(e) + 1;
+      b = { tipo: "li", marcador: lista.matches("ol") ? `${n}.` : "•", tramos: tramosDe(e) };
+    } else b = { tipo: e.matches("h2, h3, h4") ? "h" : e.matches("blockquote") ? "cita" : "p", tramos: tramosDe(e) };
+    if ((b.tramos && !b.tramos.length) || (b.celdas && !b.celdas.length)) continue;
+    if (apuntes) b.apuntes = apuntes;
+    bloques.push(b);
+  }
+  return { bloques, perdidas };
+}
+function modeloPdf(ids, modo, filtro) {
+  const notas = [];
+  for (const id of ids) {
+    const reg = estado.biblioteca.get(id) || registroDe(id);
+    const n = reg.nota || notaPorId(id);
+    if (!n) continue;
+    const marcas = marcasEnOrden(reg, filtro);
+    if (modo === "marcas" && !marcas.length) continue;
+    const medio = { nombre: reg.medio.nombre, letra: reg.medio.linea.letra, color: reg.medio.linea.color, tinta: reg.medio.linea.tinta };
+    const base = { titulo: n.titulo, bajada: bajadaSinRepetir(n), autor: n.autor || "", fecha: n.publicada || n.fecha || "", minutos: n.minutos || 0, url: n.url, a_medias: Boolean(n.a_medias), medio };
+    if (modo === "marcas") {
+      // Las marcas que ya no están en el texto también salen (su texto está guardado).
+      notas.push({ ...base, marcas: marcas.map((d) => ({ texto: d.texto, color: d.color, apunte: d.apunte })), perdidas: [], bloques: [] });
+    } else {
+      const { bloques, perdidas } = bloquesParaPdf(n, marcas);
+      notas.push({ ...base, marcas: [], perdidas: perdidas.map((d) => ({ texto: d.texto, color: d.color, apunte: d.apunte })), bloques });
+    }
+  }
+  // Hora local, no UTC: a las 21 de Córdoba el pie ya diría el día siguiente.
+  const ahora = new Date();
+  return { exportado: new Date(ahora - ahora.getTimezoneOffset() * 60000).toISOString().slice(0, 19), notas };
+}
+function nombreDePdf(modelo, modo) {
+  const limpio = (t) => {
+    let x = t.normalize("NFC").replace(/[\/\\:*?"<>|\u0000-\u001f]/g, " ").replace(/\s+/g, " ").trim();
+    if (x.length > 60) x = x.slice(0, 60).replace(/\s+\S*$/, "");
+    return x;
+  };
+  const hoy = new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" }).replace(/\//g, "-");
+  if (modelo.notas.length === 1) return `${modo === "marcas" ? "Marcas - " : ""}${limpio(modelo.notas[0].titulo)}.pdf`;
+  return `${modo === "marcas" ? "Marcas - " : ""}${modelo.notas.length} notas - ${hoy}.pdf`;
+}
+const hojitaExportar = document.getElementById("exportar");
+let exportacion = null, abridorExportar = null, cierreExportar = 0;
+function abrirExportar(ids, { filtro = null } = {}) {
+  clearTimeout(cierreExportar);
+  abridorExportar = document.activeElement;
+  atraparFoco(hojitaExportar);
+  hojitaExportar.querySelector(".cancelar").textContent = "Cancelar";
+  exportacion = { ids, filtro, archivo: null };
+  precalentarPdf();
+  const conMarcas = ids.some((id) => marcasEnOrden(estado.biblioteca.get(id), filtro).length);
+  hojitaExportar.querySelector("h2").textContent = ids.length === 1 ? "Exportar en PDF" : `Exportar ${ids.length} notas en PDF`;
+  const marcas = hojitaExportar.querySelector('[data-modo="marcas"]');
+  marcas.disabled = !conMarcas;
+  marcas.querySelector("span").textContent = conMarcas ? "Como se ve acá: el título y lo que marcaste, con tus apuntes." : "Ninguna de estas notas tiene marcas.";
+  const filtrada = hojitaExportar.querySelector(".filtrada");
+  filtrada.hidden = !filtro;
+  if (filtro) filtrada.textContent = `Sólo las marcas ${COLOR_PLURAL[filtro]}, como en el filtro.`;
+  hojitaExportar.querySelector(".estado-pdf").textContent = "";
+  hojitaExportar.querySelector(".compartir-pdf").hidden = true;
+  for (const b of hojitaExportar.querySelectorAll("[data-modo]")) b.classList.remove("trabajando");
+  hojitaExportar.hidden = false;
+  requestAnimationFrame(() => hojitaExportar.classList.add("abierta"));
+  if (!conMarcas) { hojitaExportar.querySelector(".cancelar").focus(); armarPdf("completa", performance.now()); }   // una sola opción: directo
+  else marcas.focus();
+}
+function cerrarExportar() {
+  hojitaExportar.classList.remove("abierta");
+  soltarFoco();
+  cierreExportar = setTimeout(() => { hojitaExportar.hidden = true; }, 260);
+  exportacion = null;
+  abridorExportar?.focus?.({ preventScroll: true });
+}
+async function entregarPdf(archivo) {
+  if (exportacion?.archivo !== archivo) return;
+  if (navigator.canShare?.({ files: [archivo] })) { await navigator.share({ files: [archivo] }); return; }
+  if (!instalada()) {   // en la compu: se descarga
+    const a = el("a");
+    a.href = URL.createObjectURL(archivo);
+    a.download = archivo.name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    return;
+  }
+  throw Object.assign(new Error("sin compartir"), { name: "NotAllowedError" });
+}
+async function armarPdf(modo, t0) {
+  const exp = exportacion;
+  if (!exp) return;
+  const estadoTexto = hojitaExportar.querySelector(".estado-pdf");
+  const boton = hojitaExportar.querySelector(`[data-modo="${modo}"]`);
+  for (const b of hojitaExportar.querySelectorAll("[data-modo]")) b.disabled = true;
+  boton.classList.add("trabajando");
+  estadoTexto.textContent = "Armando el PDF…";
+  try {
+    await cargarPdf();
+    if (exportacion !== exp) return;   // cancelaste mientras se cargaba
+    const modelo = modeloPdf(exp.ids, modo, exp.filtro);
+    if (!modelo.notas.length) throw new Error("vacío");
+    const blob = window.diarioPdf.armar(modelo, modo);
+    const archivo = new File([blob], nombreDePdf(modelo, modo), { type: "application/pdf" });
+    exp.archivo = archivo;
+    const tarde = performance.now() - t0 > 4000 || (modo === "completa" && modelo.notas.length > 8);
+    if (tarde) throw Object.assign(new Error("tarde"), { name: "NotAllowedError" });
+    await entregarPdf(archivo);
+    cerrarExportar();
+  } catch (err) {
+    if (err?.name === "AbortError") { cerrarExportar(); return; }
+    if (err?.name === "NotAllowedError" && exp.archivo) {
+      // iOS pide un toque reciente para compartir: con un segundo toque sale.
+      estadoTexto.textContent = "Tu PDF está listo.";
+      const b = hojitaExportar.querySelector(".compartir-pdf");
+      b.hidden = false;
+      b.focus();
+      return;
+    }
+    if (exportacion !== exp) return;
+    estadoTexto.textContent = "No se pudo armar el PDF en este equipo.";
+    hojitaExportar.querySelector(".cancelar").textContent = "Cerrar";
+  } finally {
+    boton?.classList.remove("trabajando");
+    for (const b of hojitaExportar.querySelectorAll("[data-modo]")) b.disabled = b.dataset.modo === "marcas" && !exp.ids.some((id) => marcasEnOrden(estado.biblioteca.get(id), exp.filtro).length);
+  }
+}
+for (const b of hojitaExportar.querySelectorAll("[data-modo]")) b.addEventListener("click", () => armarPdf(b.dataset.modo, performance.now()));
+hojitaExportar.querySelector(".compartir-pdf").addEventListener("click", async () => {
+  const archivo = exportacion?.archivo;
+  if (!archivo) return;
+  try { await entregarPdf(archivo); cerrarExportar(); }
+  catch (err) { if (err?.name === "AbortError") cerrarExportar(); else hojitaExportar.querySelector(".estado-pdf").textContent = "No se pudo compartir el PDF desde acá."; }
+});
+hojitaExportar.querySelector(".cancelar").addEventListener("click", cerrarExportar);
+hojitaExportar.addEventListener("click", (ev) => { if (ev.target === hojitaExportar) cerrarExportar(); });
+function exportarPdf(ids, { filtro = null } = {}) { abrirExportar(ids, { filtro }); }
 
 /* ---------- tus notas: guardadas, para más tarde y anotaciones ---------- */
 let pestana = "guardadas";
 let eligiendo = false;
+let filtroColor = null;
 const elegidas = new Set();
+const filtroColores = panel.querySelector(".filtro-color");
 
 function abrirPanel(cual = "guardadas") {
   cerrarIndice();
   pestana = cual;
   eligiendo = false;
+  filtroColor = null;
   elegidas.clear();
   dibujarPanel();
   panel.hidden = false;
   requestAnimationFrame(() => panel.classList.add("abierto"));
-  for (const n of [libro, recorrido, indiceBoton, chipFiltro]) n.inert = true;
+  for (const n of [libro, recorrido, indiceBoton, chipFiltro, botonNueva, botonRecordatorio]) n.inert = true;
+  if (cual === "anotaciones") precalentarPdf();
+  panel.querySelector(`[data-pestana="${cual}"]`).focus({ preventScroll: true });
 }
 function cerrarPanel() {
+  eligiendo = false;
+  elegidas.clear();
+  document.documentElement.style.removeProperty("--alto-pie");
   panel.classList.remove("abierto");
-  for (const n of [libro, recorrido, indiceBoton, chipFiltro]) n.inert = false;
+  for (const n of [libro, recorrido, indiceBoton, chipFiltro, botonNueva, botonRecordatorio]) n.inert = false;
   setTimeout(() => { panel.hidden = true; }, 360);
+  indiceBoton.focus({ preventScroll: true });
 }
 panel.querySelector(".cerrar").addEventListener("click", cerrarPanel);
 for (const b of panel.querySelectorAll("[data-pestana]")) {
-  b.addEventListener("click", () => { pestana = b.dataset.pestana; eligiendo = false; elegidas.clear(); dibujarPanel(); });
+  b.addEventListener("click", () => {
+    pestana = b.dataset.pestana;
+    eligiendo = false;
+    filtroColor = null;
+    elegidas.clear();
+    dibujarPanel();
+    if (pestana === "anotaciones") precalentarPdf();
+  });
 }
-panel.querySelector(".elegir").addEventListener("click", () => { eligiendo = !eligiendo; elegidas.clear(); dibujarPanel(); });
-for (const b of panel.querySelectorAll(".seleccion [data-accion]")) {
-  b.addEventListener("click", () => { if (elegidas.size) compartir([...elegidas], b.dataset.accion); });
+panel.querySelector(".elegir").addEventListener("click", () => {
+  eligiendo = !eligiendo;
+  elegidas.clear();
+  dibujarPanel();
+  if (eligiendo && pestana !== "tarde") precalentarPdf();
+});
+panel.querySelector(".todas").addEventListener("click", () => {
+  const ids = idsDeLaPestana();
+  const todas = ids.length && ids.every((id) => elegidas.has(id));
+  elegidas.clear();
+  if (!todas) ids.forEach((id) => elegidas.add(id));
+  dibujarPanel();
+});
+panel.querySelector(".herramientas .pdf").addEventListener("click", () => exportarPdf(idsDeLaPestana(), { filtro: filtroColor }));
+for (const b of filtroColores.querySelectorAll("button")) {
+  b.addEventListener("click", () => {
+    filtroColor = b.dataset.color && filtroColor !== b.dataset.color ? b.dataset.color : null;
+    elegidas.clear();
+    dibujarPanel();
+  });
+}
+
+// Qué se puede hacer con lo elegido, según la pestaña (lo que borra va último, en coral).
+const ACCIONES = {
+  guardadas: [["pdf", "PDF"], ["compartir", "Compartir"], ["eliminar", "Eliminar"]],
+  tarde: [["hora", "Cambiar hora"], ["compartir", "Compartir"], ["quitar", "Quitar"]],
+  anotaciones: [["pdf", "PDF"], ["compartir", "Compartir"], ["desmarcar", "Borrar marcas"]],
+};
+function idsDeLaPestana() {
+  return [...panel.querySelectorAll(".guardada[data-id]")].map((x) => x.dataset.id);
+}
+const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`;
+async function eliminarGuardadas(ids) {
+  const regs = ids.map((id) => estado.biblioteca.get(id)).filter((r) => r?.guardada);
+  if (!regs.length) return;
+  const copias = instantanea(regs);
+  const conMarcas = regs.some((r) => r.destacados.length);
+  for (const r of regs) { r.guardada = null; await persistir(r); }
+  avisar(regs.length === 1 ? "Eliminaste 1 guardada" : `Eliminaste ${regs.length} guardadas`, () => restaurar(copias),
+    { detalle: conMarcas ? (regs.length === 1 ? "Sus marcas siguen en Anotaciones." : "Sus marcas siguen en Anotaciones.") : "" });
+}
+async function quitarDeMasTarde(ids) {
+  const regs = ids.map((id) => estado.biblioteca.get(id)).filter((r) => r?.masTarde);
+  if (!regs.length) return;
+  const copias = instantanea(regs);
+  for (const r of regs) { r.masTarde = null; r.avisado = false; await persistir(r); }
+  avisar(`Quitaste ${regs.length} de Más tarde`, () => restaurar(copias));
+}
+async function borrarMarcasDe(ids, filtro = null) {
+  const regs = ids.map((id) => estado.biblioteca.get(id)).filter((r) => r?.destacados.length);
+  if (!regs.length) return;
+  const copias = instantanea(regs);
+  let marcas = 0, apuntes = 0;
+  for (const r of regs) {
+    const van = r.destacados.filter((d) => !filtro || d.color === filtro);
+    marcas += van.length;
+    apuntes += van.filter((d) => d.apunte).length;
+    r.destacados = r.destacados.filter((d) => filtro && d.color !== filtro);
+    await persistir(r);
+  }
+  const de = regs.length === 1 ? "de la nota" : `de ${regs.length} notas`;
+  const texto = marcas === 1 ? "Borraste la marca" : `Borraste ${regs.length === 1 ? "las " : ""}${marcas} marcas`;
+  avisar(`${texto}${apuntes ? ` y ${plural(apuntes, "apunte", "apuntes")}` : ""} ${de}`, () => restaurar(copias), { duracion: apuntes ? 10000 : 6000 });
+}
+async function accionElegida(accion) {
+  if (!elegidas.size) return;
+  const ids = [...elegidas];
+  if (accion === "pdf") return exportarPdf(ids, { filtro: filtroColor });
+  if (accion === "compartir") return abrirCompartir(ids, { filtro: filtroColor });
+  if (accion === "hora") return abrirHojita(ids);
+  eligiendo = false;
+  elegidas.clear();
+  if (accion === "eliminar") await eliminarGuardadas(ids);
+  if (accion === "quitar") await quitarDeMasTarde(ids);
+  if (accion === "desmarcar") await borrarMarcasDe(ids, filtroColor);
+  dibujarPanel();
+}
+
+function encabezadoDeDia(iso) {
+  const d = new Date(iso);
+  const hoy = new Date();
+  const ayer = new Date(hoy); ayer.setDate(hoy.getDate() - 1);
+  if (d.toDateString() === hoy.toDateString()) return "Hoy";
+  if (d.toDateString() === ayer.toDateString()) return "Ayer";
+  const t = diaFmt.format(d).replace(",", "");
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+function botonAccion(texto, accion, clase = "") {
+  const b = el("button", clase || null, texto);
+  b.type = "button";
+  b.addEventListener("click", (ev) => { ev.stopPropagation(); accion(); });
+  return b;
 }
 
 function dibujarPanel() {
+  const enfocado = panel.contains(document.activeElement) ? document.activeElement.closest(".guardada")?.dataset.id : null;
+  const habiaFoco = panel.contains(document.activeElement) || document.activeElement === document.body;
+  dibujarPanelSinFoco();
+  if (panel.hidden || !habiaFoco || panel.contains(document.activeElement)) return;
+  const destino = (enfocado && panel.querySelector(`.guardada[data-id="${enfocado}"] .titulo`)) || panel.querySelector(".guardada .titulo") || panel.querySelector(`[data-pestana="${pestana}"]`);
+  destino?.focus({ preventScroll: true });
+}
+function dibujarPanelSinFoco() {
   for (const b of panel.querySelectorAll("[data-pestana]")) b.setAttribute("aria-selected", String(b.dataset.pestana === pestana));
+  const ahora = Date.now();
   const fechaNota = (r) => r.nota.publicada || r.nota.fecha || r.guardada;
-  const ultimaMarca = (r) => r.destacados.reduce((a, d) => (d.creado > a ? d.creado : a), "");
-  const regs = [...estado.biblioteca.values()].filter((r) =>
+  const actividad = (r) => r.destacados.reduce((a, d) => [d.creado, d.editado || ""].reduce((x, y) => (y > x ? y : x), a), "");
+  let regs = [...estado.biblioteca.values()].filter((r) =>
     (pestana === "guardadas" ? r.guardada : pestana === "tarde" ? r.masTarde : r.destacados.length));
-  // Guardadas: por fecha de la nota, de la más nueva a la más vieja. Más tarde: por hora del recordatorio.
-  // Anotaciones: la nota que marcaste último, arriba.
+  // El filtro de color aparece en Anotaciones recién cuando usaste dos colores o más.
+  const coloresUsados = new Set(pestana === "anotaciones" ? regs.flatMap((r) => r.destacados.map((d) => d.color)) : []);
+  if (coloresUsados.size < 2 || (filtroColor && !coloresUsados.has(filtroColor))) filtroColor = null;
+  filtroColores.hidden = pestana !== "anotaciones" || coloresUsados.size < 2;
+  for (const b of filtroColores.querySelectorAll("button")) {
+    b.setAttribute("aria-pressed", String(b.dataset.color ? b.dataset.color === filtroColor : !filtroColor));
+    if (b.dataset.color) b.hidden = !coloresUsados.has(b.dataset.color);
+  }
+  if (filtroColor) regs = regs.filter((r) => r.destacados.some((d) => d.color === filtroColor));
   if (pestana === "guardadas") regs.sort((a, b) => fechaNota(b).localeCompare(fechaNota(a)));
   else if (pestana === "tarde") regs.sort((a, b) => a.masTarde.localeCompare(b.masTarde));
-  else regs.sort((a, b) => ultimaMarca(b).localeCompare(ultimaMarca(a)));
+  else regs.sort((a, b) => actividad(b).localeCompare(actividad(a)));
 
   const herramientas = panel.querySelector(".herramientas");
   herramientas.hidden = !regs.length;
-  const marcas = regs.reduce((t, r) => t + r.destacados.length, 0);
-  const notas = `${regs.length} ${regs.length === 1 ? "nota" : "notas"}`;
-  herramientas.querySelector(".total").textContent = pestana === "anotaciones" ? `${marcas} ${marcas === 1 ? "marca" : "marcas"} en ${notas}` : notas;
+  const notas = plural(regs.length, "nota", "notas");
+  let total = notas;
+  if (pestana === "tarde") {
+    const ya = regs.filter((r) => new Date(r.masTarde).getTime() <= ahora).length;
+    if (ya) total += ` · ${ya} para ahora`;
+  } else if (pestana === "anotaciones") {
+    const marcas = regs.flatMap((r) => marcasEnOrden(r, filtroColor));
+    const apuntes = marcas.filter((d) => d.apunte).length;
+    const cuales = filtroColor ? `${marcas.length === 1 ? "marca" : "marcas"} ${marcas.length === 1 ? COLOR_SINGULAR[filtroColor] : COLOR_PLURAL[filtroColor]}` : (marcas.length === 1 ? "marca" : "marcas");
+    total = `${marcas.length} ${cuales}${apuntes ? ` y ${plural(apuntes, "apunte", "apuntes")}` : ""} en ${notas}`;
+  }
+  herramientas.querySelector(".total").textContent = total;
   herramientas.querySelector(".elegir").textContent = eligiendo ? "Listo" : "Elegir";
+  herramientas.querySelector(".pdf").hidden = pestana !== "anotaciones" || eligiendo;
 
   const lista = panel.querySelector(".lista");
+  lista.classList.toggle("con-pie", eligiendo);
   lista.replaceChildren();
   if (!regs.length) {
     const [titulo, texto] = {
       guardadas: ["Todavía no guardaste notas.", "En el lector, tocá el señalador para guardar una nota."],
       tarde: ["No tenés notas para más tarde.", "En el lector, tocá el reloj y elegí cuándo querés que te la recuerde."],
-      anotaciones: ["Todavía no marcaste nada.", "En el lector, tocá el lápiz y después la frase que querés marcar. También podés mantener apretado el texto, elegir un pedazo y tocar «Marcar»."],
+      anotaciones: ["Todavía no marcaste nada.", "En una nota, tocá una frase y elegí un color. Para marcar un pedazo exacto, mantené apretado el texto. Con «Escribir» dejás un apunte al lado."],
     }[pestana];
     const vacio = el("div", "vacio");
     vacio.append(el("h3", null, titulo), el("p", null, texto));
     lista.append(vacio);
   }
-  let diaActual = "";
+  let grupo = "";
+  const grupos = pestana === "tarde" ? new Set(regs.map((r) => (new Date(r.masTarde).getTime() <= ahora ? "ahora" : "despues"))) : null;
   for (const r of regs) {
-    const cuando = pestana === "guardadas" ? fechaNota(r) : pestana === "tarde" ? r.masTarde : ultimaMarca(r);
-    const dia = diaFmt.format(new Date(cuando));
-    if (pestana !== "tarde" && dia !== diaActual) { lista.append(el("h3", "dia", dia)); diaActual = dia; }
-    const item = el("article", "guardada");
+    // Encabezados: por día (Guardadas y Anotaciones) o «Para ahora» / «Más adelante» (Más tarde).
+    const clave = pestana === "tarde" ? (new Date(r.masTarde).getTime() <= ahora ? "Para ahora" : "Más adelante")
+      : encabezadoDeDia(pestana === "guardadas" ? fechaNota(r) : actividad(r));
+    if (clave !== grupo && (pestana !== "tarde" || grupos.size > 1)) lista.append(el("h3", "dia", clave));
+    grupo = clave;
+
+    const item = el("article", `guardada${eligiendo ? " eligiendo" : ""}${elegidas.has(r.id) ? " elegida" : ""}`);
+    item.dataset.id = r.id;
     item.style.cssText = colores(r.medio);
-    const elegirEsta = () => item.querySelector("input").click();
+    const alternar = () => {
+      if (elegidas.has(r.id)) elegidas.delete(r.id); else elegidas.add(r.id);
+      item.classList.toggle("elegida", elegidas.has(r.id));
+      const tilde = item.querySelector("input");
+      if (tilde) tilde.checked = elegidas.has(r.id);
+      pintarSeleccion();
+    };
     if (eligiendo) {
       const tilde = el("input");
       tilde.type = "checkbox";
       tilde.checked = elegidas.has(r.id);
-      tilde.setAttribute("aria-label", `Elegir: ${r.nota.titulo}`);
-      tilde.addEventListener("change", () => { tilde.checked ? elegidas.add(r.id) : elegidas.delete(r.id); pintarSeleccion(); });
+      tilde.setAttribute("aria-label", r.nota.titulo);
+      tilde.addEventListener("click", (ev) => { ev.stopPropagation(); alternar(); tilde.checked = elegidas.has(r.id); });
       item.append(tilde);
-      item.classList.add("eligiendo");
+      item.addEventListener("click", alternar);
     }
-    const pie = el("p", "pie");
-    pie.append(insignia(r.medio), document.createTextNode(r.medio.nombre),
-      el("span", "gris", pestana === "tarde" ? `· para después de las ${hora(r.masTarde)}` : `· ${hora(r.nota.publicada || r.nota.fecha)}`));
-    // Tocar el título abre la nota acá, en el lector del diario.
+    // El título va primero y el pie debajo: nada arriba de los títulos.
     const titulo = el("button", "titulo", r.nota.titulo);
     titulo.type = "button";
-    titulo.addEventListener("click", () => (eligiendo ? elegirEsta() : abrirNota(r.id)));
-    item.append(pie, titulo);
-    if (r.destacados.length && pestana !== "tarde") {
+    titulo.addEventListener("click", (ev) => { if (eligiendo) return; ev.stopPropagation(); abrirNota(r.id); });
+    const pie = el("p", "pie");
+    const detalles = [];
+    if (pestana === "tarde") {
+      const d = new Date(r.masTarde);
+      if (d.getTime() <= ahora) detalles.push(`desde las ${horaFmt.format(d)}`);
+      else {
+        const dias = Math.round((new Date(d).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)) / 864e5);
+        const h = `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
+        detalles.push(dias === 0 ? `hoy, ${h}` : dias === 1 ? `mañana, ${h}` : `${diaFmt.format(d).split(",")[0]}, ${h}`);
+      }
+    } else detalles.push(hora(r.nota.publicada || r.nota.fecha));
+    if (r.nota.a_medias) detalles.push("a medias");
+    if (pestana === "guardadas" && r.destacados.length) detalles.push(plural(r.destacados.length, "marca", "marcas"));
+    pie.append(insignia(r.medio), document.createTextNode(r.medio.nombre), el("span", `gris${pestana === "tarde" && new Date(r.masTarde).getTime() <= ahora ? " ya" : ""}`, `· ${detalles.filter(Boolean).join(" · ")}`));
+    item.append(titulo, pie);
+
+    if (pestana === "anotaciones") {
+      const perdidas = marcasPerdidasDe(r);
       const ul = el("ul", "destacados");
-      for (const d of r.destacados) {
+      for (const d of marcasEnOrden(r, filtroColor)) {
         const li = el("li");
+        li.dataset.color = d.color;
+        const perdida = perdidas.has(d.id);
+        li.classList.toggle("perdida", perdida);
         const ir = el("button", "marca");
         ir.type = "button";
         ir.append(el("mark", null, d.texto));
         ir.setAttribute("aria-label", `Abrir la nota en esta marca: ${d.texto}`);
-        ir.addEventListener("click", () => (eligiendo ? elegirEsta() : abrirNota(r.id, { marca: d.texto })));
-        li.append(ir);
-        if (pestana === "anotaciones" && !eligiendo) {
+        ir.addEventListener("click", (ev) => { if (eligiendo) return; ev.stopPropagation(); abrirNota(r.id, { marca: d.id }); });
+        const cuerpoMarca = el("div", "cuerpo-marca");
+        cuerpoMarca.append(ir);
+        if (d.apunte) {
+          const ap = el("p", "apunte-panel", d.apunte);
+          ap.addEventListener("click", (ev) => { if (eligiendo) return; ev.stopPropagation(); abrirNota(r.id, { marca: d.id }); });
+          cuerpoMarca.append(ap);
+        }
+        if (perdida) cuerpoMarca.append(el("p", "perdida", "Ya no está en el texto de la nota."));
+        li.append(cuerpoMarca);
+        if (!eligiendo) {
           const borrar = el("button", "borrar");
           borrar.type = "button";
-          borrar.setAttribute("aria-label", `Desmarcar: ${d.texto}`);
-          borrar.title = "Desmarcar";
+          borrar.setAttribute("aria-label", "Borrar esta marca");
           borrar.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
-          borrar.addEventListener("click", async () => {
-            r.destacados = r.destacados.filter((x) => x.texto !== d.texto);
+          borrar.addEventListener("click", async (ev) => {
+            ev.stopPropagation();
+            const copias = instantanea([r]);
+            r.destacados = r.destacados.filter((x) => x.id !== d.id);
             await persistir(r);
             dibujarPanel();
-            avisar("Desmarcado");
+            avisar(d.apunte ? "Borraste la marca y su apunte" : "Borraste la marca", () => restaurar(copias), { duracion: d.apunte ? 10000 : 6000 });
           });
           li.append(borrar);
         }
@@ -1379,30 +2720,22 @@ function dibujarPanel() {
     }
     if (!eligiendo) {
       const acciones = el("div", "acciones");
-      const c = el("button", null, "Compartir");
-      c.type = "button";
-      c.addEventListener("click", () => compartir([r.id], "compartir"));
-      acciones.append(c);
-      if (pestana === "anotaciones") {
-        const todo = el("button", null, r.destacados.length > 1 ? "Desmarcar todo" : "Desmarcar");
-        todo.type = "button";
-        todo.addEventListener("click", async () => {
-          r.destacados = [];
-          await persistir(r);
-          dibujarPanel();
-          avisar("Desmarcada");
-        });
-        acciones.append(todo);
+      if (pestana === "guardadas") {
+        acciones.append(
+          botonAccion("PDF", () => exportarPdf([r.id])),
+          botonAccion("Compartir", () => abrirCompartir([r.id])),
+          botonAccion("Eliminar", async () => { await eliminarGuardadas([r.id]); dibujarPanel(); }));
+      } else if (pestana === "tarde") {
+        acciones.append(
+          botonAccion("Cambiar hora", () => abrirHojita(r.id)),
+          botonAccion("Compartir", () => abrirCompartir([r.id])),
+          botonAccion("Quitar", async () => { await quitarDeMasTarde([r.id]); dibujarPanel(); }));
       } else {
-        const q = el("button", null, "Quitar");
-        q.type = "button";
-        q.addEventListener("click", async () => {
-          if (pestana === "guardadas") r.guardada = null; else r.masTarde = null;  // las marcas quedan en Anotaciones
-          await persistir(r);
-          dibujarPanel();
-          avisar("Quitada");
-        });
-        acciones.append(q);
+        const cuantas = marcasEnOrden(r, filtroColor).length;
+        acciones.append(
+          botonAccion("PDF", () => exportarPdf([r.id], { filtro: filtroColor })),
+          botonAccion("Compartir", () => abrirCompartir([r.id], { filtro: filtroColor })),
+          botonAccion(cuantas === 1 ? "Borrar la marca" : "Borrar marcas", async () => { await borrarMarcasDe([r.id], filtroColor); dibujarPanel(); }));
       }
       item.append(acciones);
     }
@@ -1413,8 +2746,24 @@ function dibujarPanel() {
 function pintarSeleccion() {
   const pie = panel.querySelector(".seleccion");
   pie.hidden = !eligiendo;
+  document.documentElement.style.setProperty("--alto-pie", eligiendo ? `${pie.getBoundingClientRect().height || 120}px` : "0px");
   pie.querySelector(".cuantas").textContent = elegidas.size ? `${elegidas.size} ${elegidas.size === 1 ? "elegida" : "elegidas"}` : "Elegí notas";
-  for (const b of pie.querySelectorAll("button")) b.disabled = !elegidas.size;
+  const caja = pie.querySelector(".acciones");
+  if (caja.dataset.pestana !== pestana) {
+    caja.replaceChildren(...ACCIONES[pestana].map(([accion, texto]) => {
+      const b = el("button", accion === "eliminar" || accion === "desmarcar" || accion === "quitar" ? "peligro" : null, texto);
+      b.type = "button";
+      b.dataset.accion = accion;
+      b.addEventListener("click", () => accionElegida(accion));
+      return b;
+    }));
+    caja.dataset.pestana = pestana;
+  }
+  for (const b of caja.querySelectorAll("button")) b.disabled = !elegidas.size;
+  const todas = panel.querySelector(".todas");
+  todas.hidden = !eligiendo;
+  const ids = idsDeLaPestana();
+  todas.textContent = ids.length && ids.every((id) => elegidas.has(id)) ? "Ninguna" : "Elegir todas";
 }
 
 /* ---------- índice: la red completa, siempre a mano ---------- */
@@ -1454,6 +2803,7 @@ function abrirIndice() {
   boton("Guardadas", regs.filter((r) => r.guardada).length, () => abrirPanel("guardadas"));
   boton("Para más tarde", regs.filter((r) => r.masTarde).length, () => abrirPanel("tarde"));
   boton("Anotaciones", regs.filter((r) => r.destacados.length).length, () => abrirPanel("anotaciones"));
+  boton("Avisos de último momento", null, abrirAvisos);
   boton(estado.filtro ? `Medios: sólo ${estado.medios.get(estado.filtro).nombre}` : "Medios", null, () => { cerrarIndice(); abrirMedios(null); });
   indice.hidden = false;
   indiceBoton.setAttribute("aria-expanded", "true");

@@ -26,7 +26,7 @@ Ningún texto pasa por una IA: no hay resúmenes, traducciones ni reescrituras. 
 
 - Se abre desde la pantalla de inicio como una app, en vertical y horizontal; el iPad y el iPhone pesan lo mismo.
 - La edición se arma sola en GitHub cada 15 a 20 minutos; la app guarda la última para leer sin conexión.
-- Medios (datos/medios.json), 22 en tres grupos. De acá: Clarín, El Doce, Filo News, Infobae, La Nación, La Política Online, Le Monde Diplomatique Cono Sur, Letra P, Página/12, Perfil y Todo Noticias. De afuera: BBC Mundo, CNN en Español, El Mundo, El Orden Mundial, El País, Infobae América, Le Grand Continent y The New York Times en Español. Economía y tecnología: Bloomberg Línea, Hipertextual y Xataka.
+- Medios (datos/medios.json), 27 en tres grupos. De acá: Cadena 3, cba24n, Clarín, El Alfil, El Doce, La Nueva Mañana, La Voz, Filo News, Infobae, La Nación, La Política Online, Le Monde Diplomatique Cono Sur, Letra P, Página/12, Perfil y Todo Noticias. De afuera: BBC Mundo, CNN en Español, El Mundo, El Orden Mundial, El País, Infobae América, Le Grand Continent y The New York Times en Español. Economía y tecnología: Bloomberg Línea, Hipertextual y Xataka.
 - Inspiración de uso declarada: Flipboard (tapa, páginas que se pasan, secciones, lector limpio). No se copian sus funciones sociales ni su publicidad.
 
 ## Capabilities and Constraints
@@ -35,7 +35,18 @@ Ningún texto pasa por una IA: no hay resúmenes, traducciones ni reescrituras. 
 - Cada nota trae: medio, título, bajada (casi siempre), autor (a veces), fecha, foto principal (casi siempre), cuerpo en HTML (párrafos, intertítulos, fotos con epígrafe, citas, listas) y enlace al original.
 - La edición se lee por secciones, en este orden: Política argentina, Política internacional (la política de afuera de la Argentina, la política argentina contada por medios de otro país y la geopolítica de todo el mundo), Economía, Sociedad y policiales, IA y tecnología, Deportes, Cultura y espectáculos y Otras. La tapa es un tramo propio: la principal del momento y lo más destacado de cada sección. Destacado = el hecho que más medios cuentan a la vez, más lo arriba que esté en Google News Argentina (titulares y temas: sólo como señal; nunca se muestran sus notas ni sus medios, y si Google no contesta la tapa se ordena sin él) (Gemini agrupa las notas del mismo hecho mirando títulos y bajadas, con un control de palabras en común), con desempate por lo más reciente; de cada hecho se muestra la mejor versión (completa, con foto, de hoy; en política argentina, de un medio de acá). En el lector, «También la cuentan» lleva a las versiones de otros medios. Gemini elige la sección de lo nuevo; si falla, la deciden reglas a partir de la sección que declara el medio.
 - La lista de medios (por nombre, no por insignia) deja leer uno solo.
-- Guardadas, para más tarde (sin notificación: un aviso al abrir después de la hora elegida) y anotaciones: con el lápiz del lector se marca una frase tocándola y se desmarca tocando la marca; las marcas se juntan en la pestaña Anotaciones y abren la nota en ese punto. Se comparten una o varias notas por mail o para Claude, con lo marcado. Todo queda en cada equipo; no se sincroniza entre el iPhone y el iPad.
+- Guardadas, para más tarde (sin notificación: un aviso al abrir después de la hora elegida) y anotaciones:
+  - en el lector, tocar una frase la propone y un color la marca;
+  - cada marca tiene color (amarillo, verde, celeste o rosa) y un apunte escrito «al lado»: debajo del párrafo en el teléfono, al margen en el iPad;
+  - se borra con el tacho y se puede deshacer.
+- Anotaciones junta las marcas y exporta en PDF el título y las marcas, o la nota completa con las marcas.
+- Elegir permite eliminar guardadas, quitar de más tarde o borrar marcas en lote, siempre con «Deshacer».
+- Avisos de último momento (Web Push):
+  - cuando un hecho grande lo cuentan muchos medios a la vez y Gemini confirma que es de peso (catástrofe, muerte de una personalidad, hecho político grave);
+  - como mucho 4 por día; de noche, sólo lo enorme;
+  - se activan en cada equipo y el código se pega como secreto de GitHub.
+- Muro de pago: lo que el medio declara sólo para suscriptores queda a medias (el comienzo y el enlace), en todos los medios. Todo queda en cada equipo; no se sincroniza entre el iPhone y el iPad.
+- Lo que es del sitio y no de la nota se saca entero, sin tocar el texto: «Mirá también», relacionadas, carteles de newsletter o notificaciones («Seguir leyendo», «Suscribite a…»), la ficha de BBC y, desde el cartel del muro, el resto. El crédito de una foto («Fuente de la imagen, AFP») pasa a ser su epígrafe.
 - Las notas se publican cifradas: la app pide una clave una sola vez y descifra en el dispositivo. Las notas nunca quedan legibles en público.
 - Sin decidir todavía: notificación push para la edición de la mañana (opcional).
 

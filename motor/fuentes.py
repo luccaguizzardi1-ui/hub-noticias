@@ -269,6 +269,7 @@ def _descubrir(medio):
     if notas:
         for n in notas:
             n["titulo"] = re.sub(r"\s+-\s+[^-]{2,40}$", "", n["titulo"])
+        notas.sort(key=lambda n: n["fecha"] or "", reverse=True)   # Google las da por relevancia: las últimas primero
         return "google", url, notas
     return None, None, []
 
