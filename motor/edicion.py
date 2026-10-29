@@ -152,9 +152,12 @@ SERVICIO = re.compile(r"^[^\w¿¡\"“'«]|en vivo|minuto a minuto|a cu[aá]nto 
 
 def _fecha(n):
     try:
-        return datetime.fromisoformat((n.get("publicada") or n.get("fecha") or "").replace("Z", "+00:00"))
+        d = datetime.fromisoformat((n.get("publicada") or n.get("fecha") or "").replace("Z", "+00:00"))
     except ValueError:
         return datetime(2000, 1, 1, tzinfo=timezone.utc)
+    # Algunos medios ponen la fecha sin zona ("2026-10-27"): es hora de Argentina. Sin esto, comparar
+    # con fechas con zona rompe la edición entera (pasó el 27/10).
+    return d if d.tzinfo else d.replace(tzinfo=timezone(timedelta(hours=-3)))
 
 
 def secciones_y_tapa(todas, medios=(), temas=(), google=None):
@@ -171,7 +174,12 @@ def secciones_y_tapa(todas, medios=(), temas=(), google=None):
         if de_la_categoria:
             secciones.append({"id": cat_id, "nombre": nombre, "notas": [n["id"] for n in de_la_categoria]})
 
-    destacadas = elegir_destacadas(todas, temas, grupo, google or {})
+    try:
+        destacadas = elegir_destacadas(todas, temas, grupo, google or {})
+    except Exception as e:
+        # Una falla al elegir la tapa nunca frena la edición: sale con las secciones y sin destacadas.
+        print(f"No se pudo armar la tapa ({type(e).__name__}: {e}); sale sin destacadas")
+        destacadas = {"principal": None, "secciones": []}
     # La tapa de antes (lista de ids) queda por compatibilidad con una app vieja guardada en el teléfono.
     tapa = [destacadas["principal"]] + [d["nota"] for d in destacadas["secciones"]][:2] if destacadas["principal"] else []
     return secciones, tapa, destacadas

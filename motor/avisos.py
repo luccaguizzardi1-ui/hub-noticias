@@ -53,9 +53,12 @@ ESQUEMA = {"type": "ARRAY", "items": {
 
 def _fecha(n):
     try:
-        return datetime.fromisoformat((n.get("publicada") or n.get("fecha") or "").replace("Z", "+00:00"))
+        d = datetime.fromisoformat((n.get("publicada") or n.get("fecha") or "").replace("Z", "+00:00"))
     except ValueError:
         return datetime(2000, 1, 1, tzinfo=timezone.utc)
+    # Algunos medios ponen la fecha sin zona ("2026-10-27"): es hora de Argentina. Sin esto, comparar
+    # con fechas con zona rompe la edición entera (pasó el 27/10).
+    return d if d.tzinfo else d.replace(tzinfo=timezone(timedelta(hours=-3)))
 
 
 def _mejor(ns):
