@@ -16,6 +16,7 @@ historial) no se avisa, para no repetir. La notificación lleva el título de la
 abre esa nota, que se mantiene en la edición mientras dure el historial.
 
     python motor/avisos.py --enviar avisos.json     # lo corre la tarea, después de publicar
+    python motor/avisos.py --frenada 75             # lo corre el vigía si la edición no sale hace 75 min
 """
 import argparse
 import json
@@ -192,7 +193,14 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--enviar", help="archivo con los avisos pendientes que dejó publicar.py")
     ap.add_argument("--prueba", action="store_true", help="manda un aviso de prueba a cada equipo")
+    ap.add_argument("--frenada", type=int, metavar="MIN", help="avisa que la edición no sale hace MIN minutos")
     args = ap.parse_args()
+    if args.frenada:
+        h, m = divmod(args.frenada, 60)
+        hace = f"{h} h {m:02d} min" if m else f"{h} h"
+        enviar([{"nota": "", "titulo": "La edición está frenada",
+                 "cuerpo": f"No sale una edición nueva hace {hace}. El vigía ya está intentando retomarla."}])
+        return
     if args.prueba:
         enviar([{"nota": "", "titulo": "Los avisos de último momento funcionan",
                  "cuerpo": "Prueba de el diario del pelado: cuando pase algo grande, te llega así."}])

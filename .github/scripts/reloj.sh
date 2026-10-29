@@ -4,6 +4,7 @@
 #   reloj.sh pedir <archivo> [min]  pide una corrida, con reintentos durante [min] minutos (60)
 #   reloj.sh vivas <archivo>     cuántas corridas del workflow están pedidas, esperando o en curso
 #   reloj.sh revisar             (vigía) retoma la edición si su cadena se cortó y destraba corridas
+#   reloj.sh frenada             (vigía) avisa al teléfono si la edición publicada tiene más de una hora
 #   reloj.sh latido              pide el latido si el repo lleva 30 días sin cambios
 # Con SECO=1 no pide ni cancela nada: sólo dice qué haría (para probarlo desde la compu).
 set -uo pipefail
@@ -82,6 +83,25 @@ revisar() {
   pedir edicion.yml 15
 }
 
+frenada() {
+  # Mira la edición que de verdad está publicada (no las corridas): así cubre cualquier causa. Avisa al
+  # cruzar la hora y después cada 6, en la ventana de 25 minutos de un vigía (si cae en dos, el segundo
+  # aviso reemplaza al primero en el teléfono). Nunca hace fallar al vigía.
+  local sitio generada ts edad
+  sitio="https://$(tr '[:upper:]' '[:lower:]' <<<"${REPO%%/*}").github.io/${REPO#*/}"
+  generada=$(curl -fsS --max-time 20 "$sitio/version.json?t=$(date +%s)" | jq -r '.generada // empty' 2>/dev/null)
+  ts=$(date -d "$generada" +%s 2>/dev/null)
+  if [ -z "$ts" ]; then echo "::warning::No pude leer la edición publicada"; return 0; fi
+  edad=$(( ($(date +%s) - ts) / 60 ))
+  echo "La edición publicada es de hace $edad min."
+  (( edad < 60 )) && return 0
+  echo "::warning::La edición no sale hace $edad minutos"
+  (( (edad - 60) % 360 < 25 )) || return 0
+  if [ "${SECO:-}" = 1 ]; then echo "[seco] aviso al teléfono: frenada hace $edad min"; return 0; fi
+  python3 -m venv /tmp/avisos && /tmp/avisos/bin/pip install -q pywebpush==2.5.0 \
+    && /tmp/avisos/bin/python motor/avisos.py --frenada "$edad" || true
+}
+
 latido() {
   # GitHub deshabilita los workflows con cron de un repo público que pasa 60 días sin cambios.
   local ultimo ts ult
@@ -101,6 +121,7 @@ case "${1:-}" in
   pedir) pedir "${2:?archivo}" "${3:-60}" ;;
   vivas) vivas "${2:?archivo}" ;;
   revisar) revisar ;;
+  frenada) frenada ;;
   latido) latido ;;
-  *) echo "uso: reloj.sh completar|pedir <archivo> [min]|vivas <archivo>|revisar|latido" >&2; exit 2 ;;
+  *) echo "uso: reloj.sh completar|pedir <archivo> [min]|vivas <archivo>|revisar|frenada|latido" >&2; exit 2 ;;
 esac

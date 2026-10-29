@@ -4,6 +4,7 @@
 # edición se cortó, pide una edición; si una corrida quedó trabada, la cancela. A su vez, cada edición
 # pide un vigía si no hay ninguno vivo. Para que se corten las dos a la vez tiene que fallar GitHub por
 # más de una hora (cada pedido reintenta durante una hora), y ahí quedan el cron y el push.
+# Si la edición publicada pasa una hora sin renovarse (por lo que sea), avisa al iPhone y al iPad.
 # (workflow_run no sirve: no se dispara con corridas pedidas por el token del repo; probado el 23/10.)
 # Para frenar todo: deshabilitar "Edición" y "Vigía". No borrar ni editar los entornos.
 name: Vigía
@@ -36,11 +37,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          sparse-checkout: .github/scripts
+          sparse-checkout: |
+            .github/scripts
+            motor
       - name: Completar los 20 minutos
         run: bash .github/scripts/reloj.sh completar
       - name: Revisar la edición
         run: bash .github/scripts/reloj.sh revisar
+      - name: Avisar si la edición está frenada
+        env:
+          VAPID_PRIVADA: ${{ secrets.VAPID_PRIVADA }}
+          AVISOS_IPHONE: ${{ secrets.AVISOS_IPHONE }}
+          AVISOS_IPAD: ${{ secrets.AVISOS_IPAD }}
+        run: bash .github/scripts/reloj.sh frenada
       - name: Pedir la próxima vigilancia
         if: ${{ !cancelled() }}
         run: bash .github/scripts/reloj.sh pedir vigia.yml 60
