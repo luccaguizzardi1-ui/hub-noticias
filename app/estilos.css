@@ -169,10 +169,22 @@ img { display: block; max-width: 100%; }
 .hoja.tres .pieza.chica { flex: none; }
 .hoja.tres .pieza.chica .texto { padding: 12px 18px 12px; }
 .hoja.tapa .pieza { flex: 1; }
+/* Hoja "lista": las notas sin foto, una debajo de otra, sin huecos. Con una o dos, el título manda. */
+.hoja.lista .pieza { flex: none; }
+.hoja.lista .pieza .texto { padding: 14px 18px; }
+.hoja.lista.pocas .pieza { flex: 1 1 0; justify-content: center; }
+.hoja.lista.pocas .pieza .texto { padding: 24px 22px; }
+.hoja.lista.pocas .pieza[data-largo="corto"] { --t-titulo: 34px; }
+.hoja.lista.pocas .pieza[data-largo="medio"] { --t-titulo: 28px; }
+.hoja.lista.pocas .pieza[data-largo="largo"] { --t-titulo: 24px; }
 html:not(.tableta) .hoja.tapa .pieza .foto { min-height: 200px; }
 
 /* ---------- Teléfono acostado: las piezas se ponen de costado ---------- */
 .horizontal:not(.tableta) .hoja.dos, .horizontal:not(.tableta) .hoja.tres { flex-direction: row; }
+.horizontal:not(.tableta) .hoja.lista:not(.pocas) { display: grid; grid-template-columns: 1fr 1fr; align-content: start; }
+.horizontal:not(.tableta) .hoja.lista:not(.pocas) > .friso { grid-column: 1 / 3; }
+.horizontal:not(.tableta) .hoja.lista .pieza + .pieza { border-top: 0; }
+.horizontal:not(.tableta) .hoja.lista .pieza { border-bottom: 1px solid var(--junta); }
 .horizontal:not(.tableta) .hoja.dos .pieza + .pieza, .horizontal:not(.tableta) .hoja.tres .pieza + .pieza { border-top: 0; border-left: 1px solid var(--junta); }
 .horizontal:not(.tableta) .pieza.principal { flex-direction: row; }
 .horizontal:not(.tableta) .pieza.principal .foto { flex: 0 0 52%; }
@@ -284,6 +296,13 @@ html:not(.tableta) .hoja.tapa .pieza .foto { min-height: 200px; }
 .tableta.horizontal .grilla.una .pieza .foto { flex: 0 0 60%; }
 .tableta.horizontal .grilla.una .pieza .texto { flex: 1; align-self: center; padding: 32px 36px; }
 .tableta .grilla.par { grid-template-columns: 1fr 1fr; }
+/* Lista de tableta: hasta ocho notas sin foto en dos columnas, con la bajada si el medio la da */
+.tableta .grilla.lista { grid-template-columns: 1fr 1fr; grid-auto-rows: minmax(0, 1fr); }
+.tableta .hoja.lista:not(.pocas) .grilla { grid-template-rows: repeat(4, minmax(0, 1fr)); }
+.tableta .grilla.lista .pieza { justify-content: center; }
+.tableta .hoja.lista:not(.pocas) .grilla .pieza[data-largo] { --t-titulo: 22px; }
+.tableta .grilla.lista .pieza .bajada { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-size: 15px; }
+.tableta .hoja.lista.pocas .grilla { grid-template-columns: 1fr; }
 .tableta:not(.horizontal) .grilla.par { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
 
 /* Ajustes tras la primera revisión */

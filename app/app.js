@@ -75,15 +75,35 @@ function insignia(medio, clase = "insignia") {
   return s;
 }
 function trozos(lista, patron) {
-  // Reparte las notas en hojas siguiendo un patrón de plantillas que se repite.
+  // Reparte las notas en hojas siguiendo un patrón de plantillas que se repite. Las notas sin foto
+  // (los medios que sólo dan el título) no ocupan un lugar grande, que quedaría vacío: en el teléfono
+  // llenan los renglones chicos de la hoja "tres" y, las que sobran, van juntas en hojas "lista".
+  const tableta = estado.modo === "tableta";
+  const conFoto = lista.filter((id) => estado.notas.get(id).foto);
+  const sinFoto = lista.filter((id) => !estado.notas.get(id).foto);
   const hojas = [];
-  let i = 0, p = 0;
-  while (i < lista.length) {
-    const [plantilla, cuantas] = patron[p % patron.length];
-    hojas.push({ plantilla, ids: lista.slice(i, i + cuantas) });
-    i += cuantas;
-    p++;
+  let p = 0;
+  while (conFoto.length) {
+    const [plantilla, cuantas] = patron[p++ % patron.length];
+    if (plantilla === "tres" && sinFoto.length) {
+      // Los renglones chicos no llevan foto: si hay una sola sin foto, el otro lo llena una con foto.
+      const ids = [conFoto.shift(), ...sinFoto.splice(0, 2)];
+      if (ids.length < 3 && conFoto.length) ids.push(conFoto.shift());
+      hojas.push({ plantilla, ids, fija: true });
+    } else {
+      hojas.push({ plantilla, ids: conFoto.splice(0, cuantas) });
+    }
   }
+  // Una o dos que sobran se suman como renglones a la última hoja donde entren (queda una "tres").
+  const donde = tableta ? -1 : hojas.findLastIndex((h) => h.ids.length + sinFoto.length <= 3);
+  if (sinFoto.length && sinFoto.length <= 2 && donde >= 0) {
+    hojas[donde] = { plantilla: "tres", ids: [...hojas[donde].ids, ...sinFoto.splice(0)], fija: true };
+  }
+  // Las demás, en listas parejas (7 son 4 y 3, no 5 y 2).
+  const porLista = tableta ? 8 : 5;
+  const cuantasListas = Math.ceil(sinFoto.length / porLista);
+  const porHoja = Math.ceil(sinFoto.length / (cuantasListas || 1));
+  while (sinFoto.length) hojas.push({ plantilla: "lista", ids: sinFoto.splice(0, porHoja) });
   return hojas;
 }
 let esperaToast = 0;
@@ -355,6 +375,7 @@ function hojaNotas(ids, plantilla, etiqueta, medio) {
   const techo = el("div", `friso techo${medio ? "" : " combinacion"}`);
   if (medio) techo.style.cssText = colores(medio);
   h.append(techo);
+  if (plantilla === "lista" && ids.length <= 2) h.classList.add("pocas");
   if (estado.modo === "tableta") {
     const g = el("div", `grilla ${plantilla}`);
     const conPrincipal = ["mosaico", "vertical", "una"].includes(plantilla);
@@ -362,6 +383,8 @@ function hojaNotas(ids, plantilla, etiqueta, medio) {
     h.append(g);
   } else if (plantilla === "tres") {
     ids.forEach((id, i) => h.append(pieza(id, i === 0 ? "normal" : "chica")));
+  } else if (plantilla === "lista") {
+    ids.forEach((id) => h.append(pieza(id, "chica")));
   } else {
     ids.forEach((id) => h.append(pieza(id, plantilla === "una" ? "principal" : "normal")));
   }
@@ -425,6 +448,7 @@ function hojaTerminal() {
 // La última hoja de una sección puede quedar con menos notas que su plantilla:
 // se elige la que tiene exactamente esos lugares, para que nunca quede un hueco.
 function ajustar(plantilla, cuantas) {
+  if (plantilla === "lista") return plantilla;
   if (estado.modo === "tableta") {
     if (cuantas === 1) return "una";
     if (cuantas === 2) return "par";
@@ -490,7 +514,7 @@ function armarHojas() {
     sumar(hojaApertura(sec), sec.id, []);
     const resto = sec.notas.filter((id) => !tapa.includes(id));
     for (const t of trozos(resto, patron)) {
-      sumar(hojaNotas(t.ids, ajustar(t.plantilla, t.ids.length), sec.nombre, medio), sec.id, t.ids);
+      sumar(hojaNotas(t.ids, t.fija ? t.plantilla : ajustar(t.plantilla, t.ids.length), sec.nombre, medio), sec.id, t.ids);
     }
   }
   sumar(hojaTerminal(), "fin", []);
